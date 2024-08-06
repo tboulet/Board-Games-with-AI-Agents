@@ -1,0 +1,5 @@
+name: SecretHitty
+config:
+  n_players: 5
+  n_cards_liberal: 6
+  n_cards_fascist: 11

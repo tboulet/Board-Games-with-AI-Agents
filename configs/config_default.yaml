@@ -1,11 +1,10 @@
 # Hyperparameters
-n_iterations : 10
+n_iterations : 1000
 
 # Logging
 do_wandb : False
 wandb_config:
-  project : wandb_project_example
-  entity : wandb_entity_example
+  project : Board Games with AI
 do_tb : True
 do_cli : True
 do_tqdm : True
@@ -15,8 +14,8 @@ do_tqdm : True
 # Defaults sub-configs and other Hydra config.
 defaults:
   - _self_
-  - task : brownian
-  - solver : constant
+  - game : sh
+  - agents : random
   - override hydra/hydra_logging: disabled  
   - override hydra/job_logging: disabled 
 
