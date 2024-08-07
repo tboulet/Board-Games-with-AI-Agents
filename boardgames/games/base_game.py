@@ -1,52 +1,43 @@
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 import numpy as np
-from boardgames.types import Observation, Action, State, AgentID, RewardVector
+from boardgames.types import Observation, Action, ActionsAvailable, State, AgentID
 
 
 class BaseGame(ABC):
 
     @abstractmethod
-    def reset(self) -> Tuple[State, Observation, AgentID, dict]:
+    def reset(
+        self,
+    ) -> Tuple[State, List[bool], List[Observation], List[ActionsAvailable], Dict]:
         """Reset the game to its initial state and return the initial observation and state.
 
         Returns:
             State: the initial state of the game
-            Observation: the observation of the first player
-            AgentID: the id of the first player
-            dict: additional information
+            List[bool]: the list of players playing (True) or not playing (False)
+            List[Observation]: the initial observation of each player (None if not playing)
+            List[ActionsAvailable]: the list of actions available for each player (None if not playing)
+            Dict: additional information
         """
         pass
 
     @abstractmethod
     def step(
-        self, state: State, action: Action
-    ) -> Tuple[State, Observation, RewardVector, AgentID, bool, dict]:
-        """Perform one step of the game.
+        self, state: State, list_actions: List[Action]
+    ) -> Tuple[List[float], State, List[bool], List[Observation], List[ActionsAvailable], bool, Dict]:
+        """Execute one step of the game.
 
         Args:
             state (State): the current state of the game
-            action (Action): the action to perform
-
+            list_actions (List[Action]): the list of actions to execute
+            
         Returns:
+            List[float]: the reward for each player
             State: the new state of the game
-            Observation: the observation of the next player
-            RewardVector: the reward vector obtained by each player
-            AgentID: the id of the next player
-            bool: whether the game is over
-            dict: additional information
-        """
-        pass
-
-    @abstractmethod
-    def get_actions_available(self, state: State) -> List[Action]:
-        """Return the list of actions available in the current state.
-
-        Args:
-            state (State): the current state of the game
-
-        Returns:
-            List[Action]: the list of actions available
+            List[bool]: the next list of players playing (True) or not playing (False)
+            List[Observation]: the next observation of each player (None if not playing)
+            List[ActionsAvailable]: the next list of actions available for each player (None if not playing)
+            Dict: additional information
         """
         pass
 

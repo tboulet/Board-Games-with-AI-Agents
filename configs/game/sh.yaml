@@ -1,5 +1,13 @@
-name: SecretHitty
+name: SecretHitler
 config:
+  # =========== Game parameters ===========
   n_players: 5
   n_cards_liberal: 6
   n_cards_fascist: 11
+  # n_required_fas_policies: 1
+  # n_required_lib_policies: 1
+
+  # =========== Render parameters ===========
+  print_obs: False
+  print_common_obs: False
+  pause_at_each_step: False

@@ -14,6 +14,9 @@ class Observation:
 class Action:
     pass
 
+class ActionsAvailable(list):
+    pass
+
 class AgentID(ABC):
     @abstractmethod
     def __hash__(self) -> int:

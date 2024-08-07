@@ -24,7 +24,6 @@ from boardgames.agents.base_agents import BaseAgent
 from boardgames.time_measure import RuntimeMeter
 from boardgames.utils import instantiate_class, try_get_seed
 from boardgames.games import game_name_to_GameClass
-from boardgames.agents import agent_name_to_AgentClass
 
 
 @hydra.main(config_path="configs", config_name="config_default.yaml")
@@ -57,7 +56,8 @@ def main(config: DictConfig):
     # Get the agents
     print("Creating the agents...")
     agents: List[BaseAgent] = [
-        instantiate_class(**config["agents"]["configs_agents"][i]) for i in range(n_players)
+        instantiate_class(**config["agents"]["configs_agents"][i])
+        for i in range(n_players)
     ]
 
     # Initialize loggers
@@ -75,24 +75,58 @@ def main(config: DictConfig):
 
     # Game loop
     print("\nStarting the game loop...")
-    state, obs, agent_id, info = game.reset()
+    state, list_is_playing_agents, list_obs, list_actions_available, info = game.reset()
     done = False
     game.render(state)
     while not done:
-        agent: BaseAgent = agents[agent_id]
-        actions_available = game.get_actions_available(state)
-        action = agent.act(obs, actions_available)
-        next_state, next_obs, rewards, next_agent_id, done, info = game.step(
-            state, action
+        list_actions = []
+        # Play each agent
+        for idx_agent in range(n_players):
+            if list_is_playing_agents[idx_agent]:
+                # Get the agent and corresponding observation and actions available
+                agent: BaseAgent = agents[idx_agent]
+                actions_available = list_actions_available[idx_agent]
+                obs = list_obs[idx_agent]
+                # Agent acts
+                action = agent.act(observation=obs, actions_available=actions_available)
+                list_actions.append(action)
+            else:
+                list_actions.append(None)
+        # Step the game
+        rewards, next_state, next_list_is_playing_agents, next_list_obs, next_list_actions_available, done, info, = game.step(
+            state, list_actions
         )
+        # Learn each agent
+        for idx_agent in range(n_players):
+            agent = agents[idx_agent]
+            obs = list_obs[idx_agent]
+            actions_available = list_actions_available[idx_agent]
+            is_playing = list_is_playing_agents[idx_agent]
+            action = list_actions[idx_agent]
+            reward = rewards[idx_agent]
+            next_is_playing = next_list_is_playing_agents[idx_agent]
+            next_observation = next_list_obs[idx_agent] if (next_is_playing or done) else None # Possibly let this even if not next_is_playing for optimizing learning
+            next_actions_available = next_list_actions_available[idx_agent] if next_is_playing else None # Possibly let this even if not next_is_playing for optimizing learning
+            agent.learn(
+                is_playing=is_playing,
+                observation=obs,
+                actions_available=actions_available,
+                action=action,
+                reward=reward,
+                next_is_playing=next_is_playing,
+                next_observation=next_observation,
+                next_actions_available=next_actions_available,
+                done=done,
+            )
         # Logging
         game.render(next_state)
         if len(info) != 0:
             print(f"INFO: {info}")
         # Update the state of the loop
         state = next_state
-        obs = next_obs
-        agent_id = next_agent_id
+        list_obs = next_list_obs
+        list_actions_available = next_list_actions_available
+        list_is_playing_agents = next_list_is_playing_agents
 
     print("Game over!")
     print(f"Rewards: {rewards}")

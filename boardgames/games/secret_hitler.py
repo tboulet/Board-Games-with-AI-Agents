@@ -1,6 +1,6 @@
 from boardgames.games.base_game import BaseGame
-from boardgames.types import Action, AgentID, Observation, State
-from typing import List, Optional, Tuple, Union, Dict
+from boardgames.types import Action, ActionsAvailable, AgentID, Observation, State
+from typing import Any, List, Optional, Tuple, Union, Dict
 
 import random
 
@@ -22,7 +22,6 @@ POWER_FASCIST_WIN = "Fascist Win"
 class CommonObservationsSH(list):
     def __init__(self, text: Optional[str] = "", n_players: int = 5) -> None:
         self.n_players = n_players
-        text = "\n" + text if text != "" else text
         super().__init__([text for _ in range(n_players)])
 
     def add_message(self, text: str, idx_player: int):
@@ -37,7 +36,7 @@ class CommonObservationsSH(list):
                 self.add_message(text, i)
 
     def reset(self, idx_player: int):
-        self[idx_player] = "\n"
+        self[idx_player] = ""
 
     def reset_global(self):
         for i in range(self.n_players):
@@ -56,6 +55,7 @@ class StateSH(State):
         n_cards_fascist: int = 11,
         n_required_lib_policies: int = 5,
         n_required_fas_policies: int = 6,
+        **kwargs,
     ) -> None:
         self.n_players = n_players
         self.n_cards_liberal = n_cards_liberal
@@ -98,7 +98,7 @@ class StateSH(State):
             self.n_enabled_lib_policies: int = 0
             self.last_president: AgentID = None
             self.last_chancellor: AgentID = None
-            self.candidate_president: AgentID = 0
+            self.candidate_president: AgentID = None
             self.candidate_chancellor: AgentID = None
             self.candidate_president_without_special_election: AgentID = None
             self.tracker: int = 0
@@ -110,6 +110,10 @@ class StateSH(State):
             self.votes: List[str] = [None for _ in range(n_players)]
             self.is_hitler_zone: bool = False
             self.is_veto_zone: bool = False
+            self.card_vetoed: str = None
+            self.veto_choice_chancellor: str = None
+            self.veto_choice_president: str = None
+            self.done: bool = False
             # Initialize player observations, as text
             for i in range(5):
                 if self.roles[i] == ROLE_HITLER:
@@ -128,7 +132,7 @@ class StateSH(State):
                     )
                 else:
                     raise NotImplementedError("Role not implemented")
-            self.get_to_next_nomination_phase()
+            self.start_next_nomination_phase()
         else:
             raise NotImplementedError("Only 5 players supported for now")
 
@@ -143,6 +147,12 @@ class StateSH(State):
             and self.is_alive[i]
         ]  # Only in 5 players or less
 
+    def get_first_alive_player(self) -> int:
+        idx_player = 0
+        while not self.is_alive[idx_player]:
+            idx_player += 1
+        return idx_player
+
     def get_next_alive_player(self, idx_player: int) -> int:
         idx_player = (idx_player + 1) % self.n_players
         while not self.is_alive[idx_player]:
@@ -150,7 +160,10 @@ class StateSH(State):
         return idx_player
 
     def get_next_candidate_president(self) -> int:
-        if self.candidate_president_without_special_election is None:
+        if self.candidate_president is None:
+            # If no candidate president, return the first alive player
+            return self.get_first_alive_player()
+        elif self.candidate_president_without_special_election is None:
             # If no special election, return the next player after the last candidate president
             return self.get_next_alive_player(self.candidate_president)
         else:
@@ -159,7 +172,7 @@ class StateSH(State):
             self.candidate_president_without_special_election = None
             return temp
 
-    def enact_policy(self, policy_enacted: str) -> None:
+    def apply_policy(self, policy_enacted: str) -> None:
         if policy_enacted == CARD_LIBERAL:
             # If a lib policy is enacted, check if liberals win
             self.n_enabled_lib_policies += 1
@@ -169,8 +182,7 @@ class StateSH(State):
             if self.n_enabled_lib_policies == self.n_required_lib_policies:
                 self.common_obs.add_global_message("Liberals win !")
                 self.is_one_board_full = True
-            # Check if refilling deck is needed
-            self.refill_deck_if_needed()
+                return
 
         elif policy_enacted == CARD_FASCIST:
             self.n_enabled_fas_policies += 1
@@ -180,6 +192,7 @@ class StateSH(State):
             if self.n_enabled_fas_policies == self.n_required_fas_policies:
                 self.common_obs.add_global_message("Fascists win ...")
                 self.is_one_board_full = True
+                return
             # Check if entering Hitler Zone
             if self.n_enabled_fas_policies == 3:
                 self.common_obs.add_global_message(
@@ -192,12 +205,12 @@ class StateSH(State):
                     "5 Fascist policies have been enacted, entering Veto Zone : the Chancellor and President can veto a draw of policies if they both agree."
                 )
                 self.is_veto_zone = True
-            # Check if refilling deck is needed
-            self.refill_deck_if_needed()
         else:
             raise NotImplementedError("Policy not implemented")
 
-    def get_to_next_nomination_phase(self):
+    def start_next_nomination_phase(self):
+        # Get next candidate president
+        self.candidate_president = self.get_next_candidate_president()
         # Create the observation of the next nomination
         self.common_obs.add_message(
             self.get_candidate_president_message(), self.candidate_president
@@ -220,7 +233,9 @@ class StateSH(State):
             )
 
     def get_actions_available(self) -> List[Action]:
-        return self.actions_available
+        list_actions = [[None] for _ in range(self.n_players)]
+        list_actions[self.idx_player_playing] = self.actions_available
+        return list_actions
 
 
 class SecretHitlerGame(BaseGame):
@@ -233,14 +248,32 @@ class SecretHitlerGame(BaseGame):
         self.n_players = n_players
         self.config = kwargs
 
-    def reset(self) -> Tuple[State, Observation, AgentID, Dict]:
+    def reset(
+        self,
+    ) -> Tuple[State, List[bool], List[Observation], List[ActionsAvailable], Dict]:
         state = StateSH(self.n_players, **self.config)
-        self.obs: Observation = state.common_obs[0]
-        return state, self.obs, 0, {}
+        list_are_playing = self.empty_list_except(
+            idx=state.idx_player_playing, value=True, fill=False
+        )
+        list_obs = self.empty_list_except(
+            idx=state.idx_player_playing,
+            value=state.common_obs[state.idx_player_playing],
+        )
+        list_actions_available = self.empty_list_except(
+            idx=state.idx_player_playing, value=state.actions_available
+        )
+        return state, list_are_playing, list_obs, list_actions_available, {}
 
-    def step(
-        self, state: StateSH, action: Union[int, str]
-    ) -> Tuple[StateSH, Observation, List[int], AgentID, bool, Dict]:
+    def step(self, state: StateSH, list_actions: List[Action]) -> Tuple[
+        List[float],
+        StateSH,
+        List[bool],
+        List[Observation],
+        List[ActionsAvailable],
+        bool,
+        Dict,
+    ]:
+        action = list_actions[state.idx_player_playing]
         # Nomination phase
         if state.game_phase == "Nomination":
             assert (
@@ -250,19 +283,17 @@ class SecretHitlerGame(BaseGame):
             # Create the observation of the nomination announcement
             state.common_obs.reset(state.candidate_president)
             state.common_obs.add_global_message(
+                f"Player {state.candidate_president} becomes the next president.",
+                state.candidate_president,
+            )
+            state.common_obs.add_global_message(
                 f"Player {state.candidate_president} nominated player {action} as chancellor.\nThe game proceeds to the voting phase. You must vote (Yes or No) for Government {state.candidate_president}-{action}."
             )
 
             # Entering voting phase, initialize the variables
             state.game_phase = "Voting"
             state.candidate_chancellor = action
-            state.idx_player_voting = min(
-                [
-                    idx_player
-                    for idx_player in range(state.n_players)
-                    if state.is_alive[idx_player]
-                ]
-            )
+            state.idx_player_voting = state.get_first_alive_player()
             state.n_votes_yes = 0
             state.n_votes_no = 0
             state.votes = [None for _ in range(state.n_players)]
@@ -289,25 +320,31 @@ class SecretHitlerGame(BaseGame):
             if state.n_votes_yes + state.n_votes_no == sum(state.is_alive):
                 # If the vote passed, start the legislative phase
                 if state.n_votes_yes > state.n_votes_no:
-                    # Create the observation of the vote result
-                    state.common_obs.reset_global()
-                    state.common_obs.add_global_message(
-                        f"Votes are: {state.votes}. (Yes: {state.n_votes_yes}, No: {state.n_votes_no})\nVote passed. The game proceeds to the legislative phase."
-                    )
                     # Entering legislative (president) phase
                     state.game_phase = "Legislative (President)"
                     state.tracker = 0
                     state.last_president = state.candidate_president
                     state.last_chancellor = state.candidate_chancellor
+                    # Create the observation of the vote result
+                    state.common_obs.reset_global()
+                    state.common_obs.add_global_message(
+                        f"Votes are: {state.votes}. (Yes: {state.n_votes_yes}, No: {state.n_votes_no})\nGovernment passed."
+                    )
                     # Check Hitler Chancellor election fascist victory criteria
-                    if (
-                        state.last_chancellor == state.id_hitler
-                        and state.is_hitler_zone
-                    ):
-                        state.common_obs.add_global_message(
-                            f"Hitler was elected Chancellor. Fascists win ..."
-                        )
-                        return self.get_final_return(state)
+                    if state.is_hitler_zone:
+                        if state.last_chancellor == state.id_hitler:
+                            state.common_obs.add_global_message(
+                                f"Hitler was elected Chancellor. Fascists win ..."
+                            )
+                            return self.get_final_return(state)
+                        else:
+                            state.common_obs.add_global_message(
+                                f"Player {state.last_chancellor} is confirmed not Hitler."
+                            )
+                    state.common_obs.add_global_message(
+                        "The game proceeds to the legislative phase."
+                    )
+
                     cards_drawn = (
                         state.policy_deck.pop(0),
                         state.policy_deck.pop(0),
@@ -319,8 +356,6 @@ class SecretHitlerGame(BaseGame):
                     )
                     state.actions_available = list(cards_drawn)
                     state.idx_player_playing = state.last_president
-                    # Move forward the candidate president
-                    state.candidate_president = state.get_next_candidate_president()
 
                 # If the vote failed, move forward tracker
                 else:
@@ -335,15 +370,16 @@ class SecretHitlerGame(BaseGame):
                             "Tracker reached 3. The top policy is enacted."
                         )
                         state.tracker = 0
+                        state.last_president = None
+                        state.last_chancellor = None
                         policy_enacted = state.policy_deck.pop(0)
-                        state.enact_policy(policy_enacted)
+                        self.enact_policy(state, policy_enacted, on_top_deck=True)
                         # Check if the game is over
                         if state.is_one_board_full:
                             return self.get_final_return(state)
-                    # Move forward the candidate president
-                    state.candidate_president = state.get_next_candidate_president()
-                    # Entering nomination phase
-                    state.get_to_next_nomination_phase()
+                    else:
+                        # Entering nomination phase
+                        state.start_next_nomination_phase()
 
             else:
                 # Get the next player to vote
@@ -378,6 +414,7 @@ class SecretHitlerGame(BaseGame):
         elif state.game_phase == "Legislative (Chancellor)":
             assert action in state.actions_available, f"Invalid action {action}"
             # Create the observation of the policy enactment
+            state.common_obs.reset(state.last_chancellor)
             state.common_obs.add_message(
                 f"You pick the policy {action} and discards the other.",
                 state.last_chancellor,
@@ -424,18 +461,21 @@ class SecretHitlerGame(BaseGame):
                 party_investigated = "Liberal"
             elif role_investigated in [ROLE_FASCIST, ROLE_HITLER]:
                 party_investigated = "Fascist"
+            state.common_obs.reset(state.last_president)
             state.common_obs.add_message(
                 f"You investigate the party of player {action} and see that he is {party_investigated}.",
+                state.last_president,
             )
             state.common_obs.add_global_message(
                 f"President investigated the role of player {action}."
             )
             # Entering nomination phase
-            state.get_to_next_nomination_phase()
+            state.start_next_nomination_phase()
 
         elif state.game_phase == "Special Election":
             assert action in state.actions_available, f"Invalid action {action}"
             # Create the observation of the special election
+            state.common_obs.reset(state.last_president)
             state.common_obs.add_message(
                 f"You choose player {action} as the next candidate president.",
                 state.last_president,
@@ -449,25 +489,35 @@ class SecretHitlerGame(BaseGame):
                 state.get_next_alive_player(state.last_president)
             )
             # Entering nomination phase
-            state.get_to_next_nomination_phase()
+            state.start_next_nomination_phase()
 
         elif state.game_phase == "Bullet Shot":
             assert action in state.actions_available, f"Invalid action {action}"
-            # Create the observation of the bullet shot
-            role_killed = state.roles[action]
-            state.common_obs.add_global_message(
-                f"President {state.last_president} choose to kill player {action}."
-            )
             # Kill the player
+            role_killed = state.roles[action]
+            state.common_obs.reset(state.last_president)
+            state.common_obs.add_global_message(
+                f"President {state.last_president} choose to kill player {action}.",
+                except_idx=state.last_president,
+            )
+            state.common_obs.add_message(
+                f"You have been killed by the President.", action
+            )
+            state.common_obs.add_message(
+                f"You decided to kill player {action}.", state.last_president
+            )
             state.is_alive[action] = False
             # Check Hitler death liberal victory criteria
             if role_killed == ROLE_HITLER:
                 state.common_obs.add_global_message("Hitler is killed, liberals win !")
                 return self.get_final_return(state)
+            # Entering nomination phase
+            state.start_next_nomination_phase()
 
         elif state.game_phase == "Veto (Chancellor)":
             assert action in ["Yes", "No"], f"Invalid action {action}"
             # Create the observation of the veto choice
+            state.common_obs.reset(state.last_chancellor)
             state.common_obs.add_message(
                 f"You voted {action} to veto the policy.",
                 state.last_chancellor,
@@ -486,6 +536,7 @@ class SecretHitlerGame(BaseGame):
         elif state.game_phase == "Veto (President)":
             assert action in ["Yes", "No"], f"Invalid action {action}"
             # Create the observation of the veto choice
+            state.common_obs.reset(state.last_president)
             state.common_obs.add_message(
                 f"You voted {action} to veto the policy.",
                 state.last_president,
@@ -500,58 +551,104 @@ class SecretHitlerGame(BaseGame):
                     "The policy is vetoed and discarded."
                 )
                 state.policy_discard.append(state.card_vetoed)
+                # Check if refilling deck is needed
+                state.refill_deck_if_needed()
+                # Entering nomination phase
+                state.start_next_nomination_phase()
             else:
                 state.common_obs.add_global_message(
                     f"The veto is not applied (President: {state.veto_choice_president}, Chancellor: {state.veto_choice_chancellor})."
                 )
                 self.enact_policy(state, state.card_vetoed)
+                state.card_vetoed = None
                 # Check if the game is over
                 if state.is_one_board_full:
                     return self.get_final_return(state)
-            # Entering nomination phase
-            state.get_to_next_nomination_phase()
 
         else:
             raise NotImplementedError("Game phase not implemented")
 
         # Return the next transition
-        return state, state.common_obs[state.idx_player_playing], [], state.idx_player_playing, False, {}
+        rewards = [0 for _ in range(self.n_players)]
+        list_is_playing_agents = self.empty_list_except(
+            idx=state.idx_player_playing, value=True, fill=False
+        )
+        list_obs = self.empty_list_except(
+            idx=state.idx_player_playing,
+            value=state.common_obs[state.idx_player_playing],
+        )
+        list_actions_available = self.empty_list_except(
+            idx=state.idx_player_playing, value=state.actions_available
+        )
+        return (
+            rewards,
+            state,
+            list_is_playing_agents,
+            list_obs,
+            list_actions_available,
+            False,
+            {},
+        )
+
+    def empty_list_except(self, idx: int, value: Any, fill: Any = None) -> List[Any]:
+        """Create a list of size n_players with all elements set to fill except the one at idx set to value.
+
+        Args:
+            idx (int): the index of the value to set
+            value (Any): the value to set at index idx
+            fill (Any, optional): the fill value. Defaults to None.
+
+        Returns:
+            List[Any]: the list of n_players elements
+        """
+        list = [fill for _ in range(self.n_players)]
+        list[idx] = value
+        return list
 
     def get_n_players(self) -> int:
         return self.n_players
 
-    def get_actions_available(self, state: StateSH) -> List[Action]:
+    def get_list_actions_available(self, state: StateSH) -> List[List[Action]]:
         return state.get_actions_available()
 
     def render(self, state: StateSH) -> None:
-        # print(state.common_obs)
-        
-        # i = state.idx_player_playing
-        # print(f">>> Player {i} is playing :")
-        # print(f"{state.common_obs[i]}")
-        
-        # input()
-        pass
-    
-    def enact_policy(self, state: StateSH, action: str) -> None:
-        state.enact_policy(action)
+        if self.config["print_common_obs"]:
+            print(state.common_obs)
+
+        if self.config["print_obs"]:
+            if state.done:
+                print(f"The game is over. : {state.common_obs}")
+            else:
+                i = state.idx_player_playing
+                print(f"\n>>> Player {i} is playing :")
+                print(f"{state.common_obs[i]}")
+
+        if self.config["pause_at_each_step"]:
+            input()
+
+    def enact_policy(self, state: StateSH, action: str, on_top_deck=False) -> None:
+        state.apply_policy(action)
         # Check if the game is over
         if state.is_one_board_full:
             return
+        # Check if refilling deck is needed
+        state.refill_deck_if_needed()
         # In case of a fascist policy, check if a power is activated
         if action == CARD_FASCIST:
             power_activated = state.board_fas[state.n_enabled_fas_policies - 1]
+            if on_top_deck:
+                power_activated = None  # nullify power if on top deck
             if power_activated == POWER_POLICY_PEEK:
                 # Create the observation of the policy peek
                 state.common_obs.add_global_message(
-                    "'Policy Peek' power is activated. President must investigate the top 3 cards of the deck."
+                    "'Policy Peek' power is activated. President investigate the top 3 cards of the deck."
                 )
                 state.common_obs.add_message(
                     f"You investigate the 3 next cards: {state.policy_deck[:3]}.",
                     state.last_president,
                 )
                 # Entering nomination phase
-                state.get_to_next_nomination_phase()
+                state.start_next_nomination_phase()
             elif power_activated == POWER_INVESTIGATE:
                 # Create the observation of the investigation
                 state.common_obs.add_global_message(
@@ -608,16 +705,22 @@ class SecretHitlerGame(BaseGame):
                 state.idx_player_playing = state.last_president
             elif power_activated == None:
                 # Entering nomination phase
-                state.get_to_next_nomination_phase()
+                state.start_next_nomination_phase()
             else:
                 raise NotImplementedError("Power not implemented")
         else:
             # Entering nomination phase
-            state.get_to_next_nomination_phase()
+            state.start_next_nomination_phase()
 
-    def get_final_return(
-        self, state: StateSH
-    ) -> Tuple[StateSH, Observation, List[int], AgentID, bool, Dict]:
+    def get_final_return(self, state: StateSH) -> Tuple[
+        List[float],
+        StateSH,
+        List[bool],
+        List[Observation],
+        List[ActionsAvailable],
+        bool,
+        Dict,
+    ]:
         if (
             state.n_enabled_lib_policies == state.n_required_lib_policies
             or not state.is_alive[state.id_hitler]
@@ -632,4 +735,13 @@ class SecretHitlerGame(BaseGame):
         else:
             raise NotImplementedError("Game not over but final return called")
         state.common_obs.add_global_message("The game is over.")
-        return state, state.common_obs[state.idx_player_playing], rewards, None, True, {}
+        state.done = True
+        return (
+            rewards,
+            state,
+            [False for _ in range(state.n_players)],
+            state.common_obs,
+            [None for _ in range(state.n_players)],
+            True,
+            {},
+        )

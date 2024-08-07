@@ -4,4 +4,4 @@ configs_agents:
 - class_string: boardgames.agents.random:RandomAgent
 - class_string: boardgames.agents.random:RandomAgent
 - class_string: boardgames.agents.random:RandomAgent
-- class_string: boardgames.agents.human:HumanAgent
+- class_string: boardgames.agents.random:RandomAgent
