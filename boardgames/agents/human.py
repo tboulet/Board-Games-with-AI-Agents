@@ -9,8 +9,8 @@ import random
 
 class HumanAgent(BaseAgent):
 
-    def __init__(self):
-        pass
+    def __init__(self, print_info: bool = False):
+        self.print_info = print_info
 
     def act(self, observation: Observation, actions_available: List) -> Action:
         print()
@@ -38,6 +38,18 @@ class HumanAgent(BaseAgent):
         next_actions_available: ActionsAvailable,
         done: bool,
     ):
+        if self.print_info:
+            print(f"\n INFORMATIONS")
+            print(f"Is playing: {is_playing}")
+            print(f"Actions available: {actions_available}")
+            print(f"Observation: {observation}")
+            print(f"Action: {action}")
+            print(f"Reward: {reward}")
+            print(f"Next is playing: {next_is_playing}")
+            print(f"Next actions available: {next_actions_available}")
+            print(f"Next observation: {next_observation}")
+            print(f"Done: {done}")
+            print()
         if done:
             print()
             print(next_observation)

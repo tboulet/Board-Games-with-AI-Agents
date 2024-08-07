@@ -1,0 +1,11 @@
+name: TimesBomb
+config:
+  # =========== Game parameters ===========
+  n_players: 5
+  # n_cards_per_player: 5
+
+
+  # =========== Render parameters ===========
+  print_obs: True
+  print_common_obs: False
+  pause_at_each_step: True

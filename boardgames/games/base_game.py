@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 from boardgames.types import Observation, Action, ActionsAvailable, State, AgentID
 
 
 class BaseGame(ABC):
 
+    def __init__(self, n_players: int):
+        self.n_players = n_players
+        
     @abstractmethod
     def reset(
         self,
@@ -56,3 +59,20 @@ class BaseGame(ABC):
             state (State): the current state of the game
         """
         pass
+
+    # ======================== Helper functions ========================
+    
+    def empty_list_except(self, idx: int, value: Any, fill: Any = None) -> List[Any]:
+        """Create a list of size n_players with all elements set to fill except the one at idx set to value.
+
+        Args:
+            idx (int): the index of the value to set
+            value (Any): the value to set at index idx
+            fill (Any, optional): the fill value. Defaults to None.
+
+        Returns:
+            List[Any]: the list of n_players elements
+        """
+        list = [fill for _ in range(self.n_players)]
+        list[idx] = value
+        return list
