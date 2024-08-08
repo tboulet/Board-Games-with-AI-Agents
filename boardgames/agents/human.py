@@ -15,14 +15,12 @@ class HumanAgent(BaseAgent):
     def act(self, observation: Observation, actions_available: List) -> Action:
         print()
         print(observation)
-        action = input("Enter your move: ")
-        if action.isdigit():
-            action = int(action)
+        action = input("Enter your move: ")    
+        action = self.read_str_action(action)    
         while action not in actions_available:
-            print("Invalid move. Please try again.")
+            print(f"Invalid move : {action, type(action)} Please choose one of {actions_available}")
             action = input("Enter your move: ")
-            if action.isdigit():
-                action = int(action)
+            action = self.read_str_action(action)
         print(f"You chose {action}")
         return action
             
@@ -53,3 +51,12 @@ class HumanAgent(BaseAgent):
         if done:
             print()
             print(next_observation)
+
+    def read_str_action(self, action: str):
+        # Turn "0" into 0
+        if action.isdigit():
+            action = int(action)
+        # Turn "0 1" into (0, 1)
+        elif " " in action and all([x.isdigit() for x in action.split()]):
+            action = tuple([int(x) for x in action.split()])
+        return action

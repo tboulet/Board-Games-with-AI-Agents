@@ -2,10 +2,10 @@ name: TimesBomb
 config:
   # =========== Game parameters ===========
   n_players: 5
-  # n_cards_per_player: 5
+  do_force_truth_for_agents: True
 
 
   # =========== Render parameters ===========
-  print_obs: True
+  print_obs: False
   print_common_obs: False
-  pause_at_each_step: True
+  pause_at_each_step: False

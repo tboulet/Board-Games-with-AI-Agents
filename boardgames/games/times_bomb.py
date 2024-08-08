@@ -14,7 +14,7 @@ class RoleTimesBomb(str, Enum):
 
     def __repr__(self):
         return self.value
-    
+
 class CardTimesBomb(str, Enum):
     SAFE = "Safe"
     DEFUSE = "Defuse"
@@ -23,14 +23,10 @@ class CardTimesBomb(str, Enum):
     def __repr__(self):
         return self.value
 
-
 class PhaseTimesBomb(str, Enum):
     ANNOUNCEMENT = "Announcement"
     CUT = "Cut"
-
-    def __repr__(self):
-        return self.value
-
+    
 
 class StateTimesBomb(State):
 
@@ -43,6 +39,7 @@ class StateTimesBomb(State):
         n_required_bombs: int = 1,
         n_diffuses: int = None,
         n_required_diffuses: int = None,
+        do_force_truth_for_agents: bool = False,
         do_allow_1_card_round: bool = False,
         do_allow_inverse_cut: bool = False,
         **kwargs,
@@ -65,13 +62,14 @@ class StateTimesBomb(State):
         assert (
             self.n_required_diffuse <= self.n_defuses
         ), "n_required_diffuse must be less than or equal to n_diffuse"
+        self.force_truth_for_agents = do_force_truth_for_agents
         self.n_found_defuse = 0
         self.n_neutral_cards = (
             self.n_players * self.n_cards_per_player - self.n_bombs - self.n_defuses
         )
         self.do_allow_1_card_round = do_allow_1_card_round
         self.do_allow_inverse_cut = do_allow_inverse_cut
-        self.list_is_playing_agents: List[bool] = (None,)
+        self.list_is_playing_agents: List[bool] = None
         self.previous_player_cutter: int = None
         self.done: bool = False
         self.config = kwargs
@@ -95,6 +93,7 @@ class StateTimesBomb(State):
         random.shuffle(self.deck)
         self.cards_revealed: List[CardTimesBomb] = []
         self.hands: List[List[CardTimesBomb]] = None
+        self.hands_revealed: List[List[CardTimesBomb]] = None
 
     def reset(self) -> Tuple[
         State,
@@ -106,6 +105,7 @@ class StateTimesBomb(State):
         # Initialize common observation
         self.common_obs: CommonObs = CommonObs(n_players=self.n_players)
         self.common_obs.add_global_message("The game has started.")
+        self.common_obs.add_global_message(f"Table is composed of {self.n_players} players among which {self.roles.count(RoleTimesBomb.AGENT)} agents and {self.roles.count(RoleTimesBomb.GANGSTER)} gangsters.")
         
         # Determine randomly starting player
         self.player_cutter: int = random.randint(0, self.n_players - 1)
@@ -118,10 +118,11 @@ class StateTimesBomb(State):
                 self.hands[i].append(self.deck.pop())
             self.common_obs.add_message(f"You are at seet {i}. You get assigned the role {self.roles[i]}.", i)
         assert len(self.deck) == 0, "Deck should be empty after distributing cards."
+        self.hands_revealed = [[] for _ in range(self.n_players)]
         
         # Start first round
-        rewards, next_state, list_is_playing_agents, list_obs, list_actions_available, done, info = self.start_new_round()
-        return next_state, list_is_playing_agents, list_obs, list_actions_available, info
+        rewards, next_state, self.list_is_playing_agents, list_obs, list_actions_available, done, info = self.start_new_round()
+        return next_state, self.list_is_playing_agents, list_obs, list_actions_available, info
     
     def start_new_cut(self) -> Tuple[
         State,
@@ -131,15 +132,6 @@ class StateTimesBomb(State):
         Dict,
     ]:
         self.game_phase = PhaseTimesBomb.CUT
-        rewards = [0 for _ in range(self.n_players)]
-        list_is_playing_agents = self.game.empty_list_except(
-            idx=self.player_cutter, value=True, fill=False
-        )
-        list_obs = self.game.empty_list_except(
-            idx=self.player_cutter,
-            value=self.common_obs[self.player_cutter],
-            fill=False,
-        )
         actions_available_for_cutter = []
         for idx_player in range(self.n_players):
             if (
@@ -165,10 +157,19 @@ class StateTimesBomb(State):
         self.common_obs.add_message(
             f"You must pick a player from which to cut a wire.", self.player_cutter
         )
+        rewards = [0 for _ in range(self.n_players)]
+        self.list_is_playing_agents = self.game.empty_list_except(
+            idx=self.player_cutter, value=True, fill=False
+        )
+        list_obs = self.game.empty_list_except(
+            idx=self.player_cutter,
+            value=self.common_obs[self.player_cutter],
+            fill=False,
+        )
         return (
             rewards,
             self,
-            list_is_playing_agents,
+            self.list_is_playing_agents,
             list_obs,
             list_actions_available,
             False,
@@ -186,18 +187,20 @@ class StateTimesBomb(State):
     ]:
         # Start a new round
         self.common_obs.add_global_message(
-            f"Starting {self.n_cards_per_player}-cards-per-player round. Unrevealed cards are reshuffled and redistributed equally."
+            f"Starting {self.n_cards_per_player}-cards-per-player round. Unrevealed cards are reshuffled and redistributed equally. There is {self.n_bombs-self.n_found_bombs} bombs and {self.n_defuses-self.n_found_defuse} defusing wires among the {sum([len(hand) for hand in self.hands])} unrevealed cards."
         )
         self.previous_player_cutter = None
 
         # Put hands back in the deck, shuffle it and redistribute cards
         self.deck = sum(self.hands, [])
+        random.shuffle(self.deck)
         self.hands = [[] for _ in range(self.n_players)]
         for i in range(self.n_players):
             for _ in range(self.n_cards_per_player):
                 self.hands[i].append(self.deck.pop())
             self.common_obs.add_message(f"You obtain the following cards : {self.hands[i]}", i)
         assert len(self.deck) == 0, "Deck should be empty after redistributing cards."
+        self.hands_revealed = [[] for _ in range(self.n_players)]
         
         # Entering announcement phase
         self.game_phase: PhaseTimesBomb = PhaseTimesBomb.ANNOUNCEMENT
@@ -215,7 +218,11 @@ class StateTimesBomb(State):
             ):
                 actions_available.append((n_b, n_d))
         list_actions_available = [actions_available for _ in range(self.n_players)]
-
+        if self.force_truth_for_agents:
+            for i in range(self.n_players):
+                if self.roles[i] == RoleTimesBomb.AGENT:
+                    list_actions_available[i] = [(self.hands[i].count(CardTimesBomb.BOMB), self.hands[i].count(CardTimesBomb.DEFUSE))]
+                    
         # Return
         return rewards, self, self.list_is_playing_agents, list_obs, list_actions_available, False, {}
 
@@ -235,9 +242,7 @@ class StateTimesBomb(State):
             for idx_player, action in enumerate(list_actions):
                 n_b, n_d = action
                 self.announcement[idx_player] = (n_b, n_d)
-                self.common_obs.add_global_message(
-                    f"Player {idx_player} announced : {n_b} bombs and {n_d} diffuse wires.",
-                )
+            self.create_announcement_message()
             # Call the next phase
             return self.start_new_cut()
 
@@ -249,6 +254,7 @@ class StateTimesBomb(State):
             card_cut = self.hands[idx_player_cut].pop()
             self.previous_player_cutter = self.player_cutter
             self.cards_revealed.append(card_cut)
+            self.hands_revealed[idx_player_cut].append(card_cut)
             # Apply the effect of the cut
             if card_cut == CardTimesBomb.BOMB:
                 self.n_found_bombs += 1
@@ -285,6 +291,9 @@ class StateTimesBomb(State):
             else:
                 raise ValueError(f"Unknown card : {card_cut}")
 
+            # Update the announcement
+            self.create_announcement_message()
+            
             # Player cutter becomes the player cut
             self.player_cutter = idx_player_cut
 
@@ -312,6 +321,20 @@ class StateTimesBomb(State):
         else:
             raise ValueError(f"Unknown game phase : {self.game_phase}")
 
+    def create_announcement_message(self) -> str:
+        for idx_player, (n_b, n_d) in enumerate(self.announcement):
+            visual_announcement = ["B?"] * n_b + ["D?"] * n_d + ["--"] * (self.n_cards_per_player - n_b - n_d)
+            visual_announcement = "[" + " ".join(visual_announcement) + "]"
+            if len(self.hands_revealed[idx_player]) > 0:
+                n_b_revealed = self.hands_revealed[idx_player].count(CardTimesBomb.BOMB)
+                n_d_revealed = self.hands_revealed[idx_player].count(CardTimesBomb.DEFUSE)
+                n_neutral_revealed = self.hands_revealed[idx_player].count(CardTimesBomb.SAFE)
+                visual_announcement_reveal = ["B"] * n_b_revealed + ["D"] * n_d_revealed + ["--"] * n_neutral_revealed
+                visual_announcement += f" (revealed : {'[' + ' '.join(visual_announcement_reveal) + '])'}"
+            self.common_obs.add_global_message(
+                f"Player {idx_player} announced : {n_b} bombs and {n_d} diffuse wires. {visual_announcement}",
+            )
+            
     def get_final_return(self, roles_win: List[RoleTimesBomb]) -> Tuple[
         List[float],
         State,
@@ -322,7 +345,7 @@ class StateTimesBomb(State):
         Dict,
     ]:
         rewards = [1 if role in roles_win else -1 for role in self.roles]
-        self.common_obs.add_global_message("The game is over.")
+        self.common_obs.add_global_message(f"The game is over. Roles were : {self.roles}. Remains of hands were : {self.hands}.")
         self.done = True
         return (
             rewards,
