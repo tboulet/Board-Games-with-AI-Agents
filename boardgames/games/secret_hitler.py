@@ -55,6 +55,8 @@ class StateSH(State):
         n_cards_fascist: int = 11,
         n_required_lib_policies: int = 5,
         n_required_fas_policies: int = 6,
+        do_force_play_lib_for_libs: bool = False,
+        do_force_truth_for_libs: bool = False,
         **kwargs,
     ) -> None:
         self.n_players = n_players
@@ -62,6 +64,8 @@ class StateSH(State):
         self.n_cards_fascist = n_cards_fascist
         self.n_required_lib_policies = n_required_lib_policies
         self.n_required_fas_policies = n_required_fas_policies
+        self.do_force_play_lib_for_libs = do_force_play_lib_for_libs
+        self.do_force_truth_for_libs = do_force_truth_for_libs
         self.common_obs = CommonObservationsSH(
             f"The game begins.\nDeck is shuffled ({n_cards_liberal} liberals and {n_cards_fascist} fascists).",
         )
@@ -108,6 +112,7 @@ class StateSH(State):
             self.n_votes_yes: int = None
             self.n_votes_no: int = None
             self.votes: List[str] = [None for _ in range(n_players)]
+            self.cards_drawn: List[str] = None
             self.is_hitler_zone: bool = False
             self.is_veto_zone: bool = False
             self.card_vetoed: str = None
@@ -136,6 +141,17 @@ class StateSH(State):
         else:
             raise NotImplementedError("Only 5 players supported for now")
 
+    def get_cards_playable(self, cards_drawn: List[str], idx_player_playing: int) -> List[str]:
+        """Get the cards that the player can play given the cards drawn
+        If do_force_play_lib_for_libs is True, then if the player is liberal, he can only plays Liberal cards (unless no other choice).
+        Otherwise, the player can play any card."""
+        if self.do_force_play_lib_for_libs and self.roles[idx_player_playing] == ROLE_LIBERAL:
+            if CARD_LIBERAL in cards_drawn and len(cards_drawn) == 2:
+                return [CARD_LIBERAL]
+            elif CARD_FASCIST in cards_drawn and len(cards_drawn) == 3:
+                return [CARD_FASCIST]
+        return cards_drawn           
+        
     def get_candidate_president_message(self) -> str:
         return f"You are the candidate president. You must propose a candidate chancellor among {self.get_possible_chancellor_candidates()}."
 
@@ -328,7 +344,7 @@ class SecretHitlerGame(BaseGame):
                     # Create the observation of the vote result
                     state.common_obs.reset_global()
                     state.common_obs.add_global_message(
-                        f"Votes are: {state.votes}. (Yes: {state.n_votes_yes}, No: {state.n_votes_no})\nGovernment passed."
+                        f"Votes are: {state.votes}. (Yes: {state.n_votes_yes}, No: {state.n_votes_no})\nGovernment passed. Tracker reset to 0."
                     )
                     # Check Hitler Chancellor election fascist victory criteria
                     if state.is_hitler_zone:
@@ -350,13 +366,17 @@ class SecretHitlerGame(BaseGame):
                         state.policy_deck.pop(0),
                         state.policy_deck.pop(0),
                     )
+                    state.cards_drawn = list(cards_drawn)
+                    state.actions_available = state.get_cards_playable(cards_drawn=state.cards_drawn, idx_player_playing=state.last_president)
+                    state.idx_player_playing = state.last_president
                     state.common_obs.add_message(
                         f"You draw the following cards: {cards_drawn}. You must discard one.",
                         state.last_president,
                     )
-                    state.actions_available = list(cards_drawn)
-                    state.idx_player_playing = state.last_president
-
+                    state.common_obs.add_message(
+                        f"Pick an action among {state.actions_available}.", state.last_president
+                    )
+                    
                 # If the vote failed, move forward tracker
                 else:
                     # Create the observation of the vote result
@@ -391,7 +411,7 @@ class SecretHitlerGame(BaseGame):
         elif state.game_phase == "Legislative (President)":
             assert action in state.actions_available, f"Invalid action {action}"
             # Perform the policy discard
-            state.actions_available.remove(action)
+            state.cards_drawn.remove(action)
             state.policy_discard.append(action)
             # Manage the observations of president and chancellor
             state.common_obs.reset(state.last_president)
@@ -399,17 +419,21 @@ class SecretHitlerGame(BaseGame):
                 f"You discard the card {action} and pass the remaining 2 cards to the chancellor.",
                 state.last_president,
             )
+            # Entering legislative (chancellor) phase
+            state.game_phase = "Legislative (Chancellor)"
+            state.actions_available = state.get_cards_playable(cards_drawn=state.cards_drawn, idx_player_playing=state.last_chancellor)
+            state.idx_player_playing = state.last_chancellor
             state.common_obs.add_global_message(
                 f"President pick the card to discards. The two remaining cards are passed to the chancellor.",
                 except_idx=state.last_president,
             )
             state.common_obs.add_message(
-                f"You receive the following cards: {state.actions_available}. You must pick one that will be enacted.",
+                f"You receive the following cards: {state.cards_drawn}. You must pick one that will be enacted.",
                 state.last_chancellor,
             )
-            # Entering legislative (chancellor) phase
-            state.game_phase = "Legislative (Chancellor)"
-            state.idx_player_playing = state.last_chancellor
+            state.common_obs.add_message(
+                f"Pick an action among {state.actions_available}.", state.last_chancellor
+            )
 
         elif state.game_phase == "Legislative (Chancellor)":
             assert action in state.actions_available, f"Invalid action {action}"
@@ -441,8 +465,8 @@ class SecretHitlerGame(BaseGame):
 
             else:
                 # Perform the policy enactment
-                state.actions_available.remove(action)
-                card_discarded = state.actions_available[0]
+                state.cards_drawn.remove(action)
+                card_discarded = state.cards_drawn[0]
                 state.policy_discard.append(card_discarded)
                 self.enact_policy(state, action)
                 # Check if the game is over
@@ -720,6 +744,7 @@ class SecretHitlerGame(BaseGame):
         else:
             raise NotImplementedError("Game not over but final return called")
         state.common_obs.add_global_message("The game is over.")
+        state.common_obs.add_global_message(f"Roles were: {state.roles}")
         state.done = True
         return (
             rewards,

@@ -61,7 +61,7 @@ def main(config: DictConfig):
     ]
 
     # Initialize loggers
-    run_name = f"[{agents_name}]_[{game_name}]_{datetime.datetime.now().strftime('%dth%mmo_%Hh%Mmin%Ss')}_seed{np.random.randint(seed)}"
+    run_name = f"[{agents_name}]_[{game_name}]_{datetime.datetime.now().strftime('%dth%mmo_%Hh%Mmin%Ss')}_seed{seed}"
     os.makedirs("logs", exist_ok=True)
     print(f"\nStarting run {run_name}")
     if do_wandb:

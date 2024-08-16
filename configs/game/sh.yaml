@@ -6,6 +6,8 @@ config:
   n_cards_fascist: 11
   # n_required_fas_policies: 1
   # n_required_lib_policies: 1
+  do_force_play_lib_for_libs: True
+  do_force_truth_for_libs: True
 
   # =========== Render parameters ===========
   print_obs: False
