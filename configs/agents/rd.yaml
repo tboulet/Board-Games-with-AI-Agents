@@ -1,4 +1,4 @@
-name: random_and_human
+name: randoms
 configs_agents:
 - class_string: boardgames.agents.random:RandomAgent
 - class_string: boardgames.agents.random:RandomAgent

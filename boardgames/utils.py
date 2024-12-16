@@ -103,3 +103,16 @@ def instantiate_class(**kwargs) -> Any:
     object_config = kwargs.copy()
     object_config.pop("class_string")
     return Class(**object_config)
+
+import ast
+
+def str_to_literal(s):
+    try:
+        # Safely evaluate the string as a Python literal
+        result = ast.literal_eval(s)
+        if isinstance(result, (tuple, int)):
+            return result
+        else:
+            raise ValueError("Input string is neither a tuple nor an integer.")
+    except (ValueError, SyntaxError) as e:
+        raise ValueError(f"Invalid input: {s}") from e

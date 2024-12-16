@@ -1,6 +1,7 @@
 from boardgames.games.base_game import BaseGame
-from boardgames.types import Action, ActionsAvailable, AgentID, Observation, State
+from boardgames.types import Action, AgentID, Observation, State
 from typing import Any, List, Optional, Tuple, Union, Dict
+from boardgames.action_spaces import ActionsSpace
 
 import random
 
@@ -141,17 +142,22 @@ class StateSH(State):
         else:
             raise NotImplementedError("Only 5 players supported for now")
 
-    def get_cards_playable(self, cards_drawn: List[str], idx_player_playing: int) -> List[str]:
+    def get_cards_playable(
+        self, cards_drawn: List[str], idx_player_playing: int
+    ) -> List[str]:
         """Get the cards that the player can play given the cards drawn
         If do_force_play_lib_for_libs is True, then if the player is liberal, he can only plays Liberal cards (unless no other choice).
         Otherwise, the player can play any card."""
-        if self.do_force_play_lib_for_libs and self.roles[idx_player_playing] == ROLE_LIBERAL:
+        if (
+            self.do_force_play_lib_for_libs
+            and self.roles[idx_player_playing] == ROLE_LIBERAL
+        ):
             if CARD_LIBERAL in cards_drawn and len(cards_drawn) == 2:
                 return [CARD_LIBERAL]
             elif CARD_FASCIST in cards_drawn and len(cards_drawn) == 3:
                 return [CARD_FASCIST]
-        return cards_drawn           
-        
+        return cards_drawn
+
     def get_candidate_president_message(self) -> str:
         return f"You are the candidate president. You must propose a candidate chancellor among {self.get_possible_chancellor_candidates()}."
 
@@ -266,7 +272,7 @@ class SecretHitlerGame(BaseGame):
 
     def reset(
         self,
-    ) -> Tuple[State, List[bool], List[Observation], List[ActionsAvailable], Dict]:
+    ) -> Tuple[State, List[bool], List[Observation], List[ActionsSpace], Dict]:
         state = StateSH(self.n_players, **self.config)
         list_are_playing = self.empty_list_except(
             idx=state.idx_player_playing, value=True, fill=False
@@ -285,7 +291,7 @@ class SecretHitlerGame(BaseGame):
         StateSH,
         List[bool],
         List[Observation],
-        List[ActionsAvailable],
+        List[ActionsSpace],
         bool,
         Dict,
     ]:
@@ -367,16 +373,20 @@ class SecretHitlerGame(BaseGame):
                         state.policy_deck.pop(0),
                     )
                     state.cards_drawn = list(cards_drawn)
-                    state.actions_available = state.get_cards_playable(cards_drawn=state.cards_drawn, idx_player_playing=state.last_president)
+                    state.actions_available = state.get_cards_playable(
+                        cards_drawn=state.cards_drawn,
+                        idx_player_playing=state.last_president,
+                    )
                     state.idx_player_playing = state.last_president
                     state.common_obs.add_message(
                         f"You draw the following cards: {cards_drawn}. You must discard one.",
                         state.last_president,
                     )
                     state.common_obs.add_message(
-                        f"Pick an action among {state.actions_available}.", state.last_president
+                        f"Pick an action among {state.actions_available}.",
+                        state.last_president,
                     )
-                    
+
                 # If the vote failed, move forward tracker
                 else:
                     # Create the observation of the vote result
@@ -421,7 +431,9 @@ class SecretHitlerGame(BaseGame):
             )
             # Entering legislative (chancellor) phase
             state.game_phase = "Legislative (Chancellor)"
-            state.actions_available = state.get_cards_playable(cards_drawn=state.cards_drawn, idx_player_playing=state.last_chancellor)
+            state.actions_available = state.get_cards_playable(
+                cards_drawn=state.cards_drawn, idx_player_playing=state.last_chancellor
+            )
             state.idx_player_playing = state.last_chancellor
             state.common_obs.add_global_message(
                 f"President pick the card to discards. The two remaining cards are passed to the chancellor.",
@@ -432,7 +444,8 @@ class SecretHitlerGame(BaseGame):
                 state.last_chancellor,
             )
             state.common_obs.add_message(
-                f"Pick an action among {state.actions_available}.", state.last_chancellor
+                f"Pick an action among {state.actions_available}.",
+                state.last_chancellor,
             )
 
         elif state.game_phase == "Legislative (Chancellor)":
@@ -726,7 +739,7 @@ class SecretHitlerGame(BaseGame):
         StateSH,
         List[bool],
         List[Observation],
-        List[ActionsAvailable],
+        List[ActionsSpace],
         bool,
         Dict,
     ]:

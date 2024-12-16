@@ -1,0 +1,23 @@
+name: random_and_human
+configs_agents:
+- class_string: boardgames.agents.human:HumanAgent
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini
+- class_string: boardgames.agents.openai_agent:OpenAI_Agent
+  model: gpt-4o-mini

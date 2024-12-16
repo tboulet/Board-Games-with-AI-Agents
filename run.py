@@ -19,6 +19,8 @@ import random
 import numpy as np
 
 # Project imports
+from boardgames.agents.base_text_agents import BaseTextAgent
+from boardgames.games.base_text_game import BaseTextBasedGame
 from boardgames.types import Observation, Action, State, AgentID, RewardVector
 from boardgames.agents.base_agents import BaseAgent
 from boardgames.time_measure import RuntimeMeter
@@ -59,6 +61,16 @@ def main(config: DictConfig):
         instantiate_class(**config["agents"]["configs_agents"][i])
         for i in range(n_players)
     ]
+    agents_text_based: List[BaseTextAgent] = [
+        agent for agent in agents if isinstance(agent, BaseTextAgent)
+    ]
+    if len(agents_text_based) > 0:
+        assert isinstance(
+            game, BaseTextBasedGame
+        ), "The game must be text-based to use text-based agents."
+        game_context = game.get_game_context()
+        for agent in agents_text_based:
+            agent.set_game_context(game_context)
 
     # Initialize loggers
     run_name = f"[{agents_name}]_[{game_name}]_{datetime.datetime.now().strftime('%dth%mmo_%Hh%Mmin%Ss')}_seed{seed}"
@@ -75,7 +87,7 @@ def main(config: DictConfig):
 
     # Game loop
     print("\nStarting the game loop...")
-    state, list_is_playing_agents, list_obs, list_actions_available, info = game.reset()
+    state, list_is_playing_agents, list_obs, list_action_spaces, info = game.reset()
     done = False
     game.render(state)
     while not done:
@@ -85,37 +97,50 @@ def main(config: DictConfig):
             if list_is_playing_agents[idx_agent]:
                 # Get the agent and corresponding observation and actions available
                 agent: BaseAgent = agents[idx_agent]
-                actions_available = list_actions_available[idx_agent]
+                action_space = list_action_spaces[idx_agent]
                 obs = list_obs[idx_agent]
                 # Agent acts
-                action = agent.act(observation=obs, actions_available=actions_available)
+                action = agent.act(observation=obs, action_space=action_space)
+                assert (
+                    action in action_space
+                ), f"Invalid action : '{action}' for agent {idx_agent}. Action space: {action_space}"
                 list_actions.append(action)
             else:
                 list_actions.append(None)
         # Step the game
-        rewards, next_state, next_list_is_playing_agents, next_list_obs, next_list_actions_available, done, info, = game.step(
-            state, list_actions
-        )
+        (
+            rewards,
+            next_state,
+            next_list_is_playing_agents,
+            next_list_obs,
+            next_list_action_spaces,
+            done,
+            info,
+        ) = game.step(state, list_actions)
         # Learn each agent
         for idx_agent in range(n_players):
             agent = agents[idx_agent]
             obs = list_obs[idx_agent]
-            actions_available = list_actions_available[idx_agent]
+            action_space = list_action_spaces[idx_agent]
             is_playing = list_is_playing_agents[idx_agent]
             action = list_actions[idx_agent]
             reward = rewards[idx_agent]
             next_is_playing = next_list_is_playing_agents[idx_agent]
-            next_observation = next_list_obs[idx_agent] if (next_is_playing or done) else None # Possibly let this even if not next_is_playing for optimizing learning
-            next_actions_available = next_list_actions_available[idx_agent] if next_is_playing else None # Possibly let this even if not next_is_playing for optimizing learning
+            next_observation = (
+                next_list_obs[idx_agent] if (next_is_playing or done) else None
+            )  # Possibly let this even if not next_is_playing for optimizing learning
+            next_action_space = (
+                next_list_action_spaces[idx_agent] if next_is_playing else None
+            )  # Possibly let this even if not next_is_playing for optimizing learning
             agent.learn(
                 is_playing=is_playing,
                 observation=obs,
-                actions_available=actions_available,
+                action_space=action_space,
                 action=action,
                 reward=reward,
                 next_is_playing=next_is_playing,
                 next_observation=next_observation,
-                next_actions_available=next_actions_available,
+                next_action_space=next_action_space,
                 done=done,
             )
         # Logging
@@ -125,7 +150,7 @@ def main(config: DictConfig):
         # Update the state of the loop
         state = next_state
         list_obs = next_list_obs
-        list_actions_available = next_list_actions_available
+        list_action_spaces = next_list_action_spaces
         list_is_playing_agents = next_list_is_playing_agents
 
     print("Game over!")

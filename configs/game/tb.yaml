@@ -2,10 +2,10 @@ name: TimesBomb
 config:
   # =========== Game parameters ===========
   n_players: 5
-  do_force_truth_for_agents: True
-
+  do_force_truth_for_defusers: True
+  do_allow_inverse_cut: True
 
   # =========== Render parameters ===========
   print_obs: False
   print_common_obs: False
-  pause_at_each_step: False
+  pause_at_each_obs_print: True
