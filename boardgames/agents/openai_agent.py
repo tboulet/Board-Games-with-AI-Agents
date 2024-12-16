@@ -115,16 +115,8 @@ class OpenAI_Agent(BaseTextAgent):
         action_match = re.search(r"Action:\s*(.+)", answer_assistant)
         if not action_match:
             print(f"Warning : no action found in the assistant's answer.")
-            print(f"Assistant's answer: {answer_assistant}")
-            print(f"Action space: {action_space}")
-            input()
             return None  # No action found : return None to signal the error
         action = action_match.group(1) # .strip() ?
         if not action in action_space:
-            print(f"Warning : the assistant provided an invalid action.")
-            print(f"Assistant's answer: {answer_assistant}")
-            print(f"Action space: {action_space}")
-            print(f"Action: {action}")
-            input()
             return None  # Action not in action space : return None to signal the error 
         return action
