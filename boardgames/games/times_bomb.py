@@ -7,7 +7,7 @@ from boardgames.action_spaces import FiniteActionSpace
 from boardgames.games.base_game import BaseGame
 from boardgames.games.base_text_game import BaseTextBasedGame
 from boardgames.types import Observation, Action, State, AgentID
-from boardgames.games.utils import CommonObs
+from boardgames.common_obs import CommonObs
 from boardgames.utils import str_to_literal
 from boardgames.action_spaces import ActionsSpace
 

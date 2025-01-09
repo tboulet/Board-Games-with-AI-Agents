@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from boardgames.games.base_game import BaseGame
 from boardgames.types import Observation, Action, State, AgentID
-from boardgames.games.utils import CommonObs
+from boardgames.common_obs import CommonObs
 from boardgames.action_spaces import ActionsSpace
 
 

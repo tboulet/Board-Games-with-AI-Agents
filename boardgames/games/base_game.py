@@ -69,17 +69,4 @@ class BaseGame(ABC):
 
     # ======================== Helper functions ========================
 
-    def empty_list_except(self, idx: int, value: Any, fill: Any = None) -> List[Any]:
-        """Create a list of size n_players with all elements set to fill except the one at idx set to value.
-
-        Args:
-            idx (int): the index of the value to set
-            value (Any): the value to set at index idx
-            fill (Any, optional): the fill value. Defaults to None.
-
-        Returns:
-            List[Any]: the list of n_players elements
-        """
-        list = [fill for _ in range(self.n_players)]
-        list[idx] = value
-        return list
+    

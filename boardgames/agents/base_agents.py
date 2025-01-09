@@ -8,7 +8,7 @@ from boardgames.types import (
     Action,
     State,
     AgentID,
-    RewardVector,
+    JointReward,
 )
 from boardgames.action_spaces import ActionsSpace
 

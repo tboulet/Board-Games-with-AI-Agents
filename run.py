@@ -21,12 +21,15 @@ import numpy as np
 # Project imports
 from boardgames.agents.base_text_agents import BaseTextAgent
 from boardgames.games.base_text_game import BaseTextBasedGame
-from boardgames.types import Observation, Action, State, AgentID, RewardVector
+from boardgames.types import Observation, Action, State, AgentID, JointReward
 from boardgames.agents.base_agents import BaseAgent
 from boardgames.time_measure import RuntimeMeter
 from boardgames.utils import instantiate_class, try_get_seed
+from boardgames.hydra_utils import register_resolvers
 from boardgames.games import game_name_to_GameClass
 
+# Register the resolvers
+register_resolvers()
 
 @hydra.main(config_path="configs", config_name="config_default.yaml")
 def main(config: DictConfig):
@@ -37,7 +40,6 @@ def main(config: DictConfig):
     # Get the config values from the config object.
     agents_name: str = config["agents"]["name"]
     game_name: str = config["game"]["name"]
-    n_iterations: int = config["n_iterations"]
     do_cli: bool = config["do_cli"]
     do_wandb: bool = config["do_wandb"]
     do_tb: bool = config["do_tb"]

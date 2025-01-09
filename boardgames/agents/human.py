@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 import numpy as np
 from boardgames.agents.base_agents import BaseAgent
 from boardgames.types import Observation, Action, State, AgentID
-from boardgames.action_spaces import ActionsSpace
+from boardgames.action_spaces import ActionsSpace, TextualActionSpace
 import random
 
 
@@ -16,14 +16,14 @@ class HumanAgent(BaseAgent):
         print()
         print(observation)
         action = input("Enter your move: ")
-        action = self.read_action(action)
+        action = self.read_action(action, action_space)
         while action not in action_space:
             print(
                 f"Invalid move : {action, type(action)} Please follow the restrictions: {action_space.get_textual_restrictions()}"
             )
             action = input("Enter your move: ")
-            action = self.read_action(action)
-        print(f"You chose {action}")
+            action = self.read_action(action, action_space)
+        print(f"You chose action : {action}")
         return action
 
     def learn(
@@ -54,5 +54,5 @@ class HumanAgent(BaseAgent):
             print()
             print(next_observation)
 
-    def read_action(self, action: Any) -> Action:
+    def read_action(self, action: Any, action_space : ActionsSpace) -> Action:
         return str(action)

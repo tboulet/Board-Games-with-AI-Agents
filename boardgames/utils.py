@@ -113,6 +113,6 @@ def str_to_literal(s):
         if isinstance(result, (tuple, int)):
             return result
         else:
-            raise ValueError("Input string is neither a tuple nor an integer.")
+            return s
     except (ValueError, SyntaxError) as e:
-        raise ValueError(f"Invalid input: {s}") from e
+        return s

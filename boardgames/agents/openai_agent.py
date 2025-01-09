@@ -68,7 +68,7 @@ class OpenAI_Agent(BaseTextAgent):
             )
             action = self.extract_action(answer_assistant, action_space)
             if action is not None:
-                print("Solved : the corrected and provided a valid action.")
+                print("Solved : the assistant corrected itself and provided a valid action.")
                 if self.do_print_reasoning:
                     print(f"Reasonning of agent: {answer_assistant}")
                 return action

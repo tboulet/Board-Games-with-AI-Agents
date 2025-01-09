@@ -1,0 +1,42 @@
+name: Werewolves
+config:
+  # =========== Config parameters ===========
+  n_players: ${eval:'sum([v["n"] for k,v in ${game.config.compo}.items()])'}
+  compo:
+    Wolf:
+      n: 3
+    Villager:
+      n: 5
+
+    # Abominable Sectarian:
+    #   n: 1
+    # Angel: 
+    #   n: 1
+    # Wolfdog:
+    #   n: 1
+    # Wild Child: 
+    #   n: 1
+    # Judge: 
+    #   n: 1
+    # Bear Showman: 
+    #   n: 1
+    # Fox: 
+    #   n: 1
+    # Villager Villager: 
+    #   n: 1
+    # Sister: 
+    #   n: 1
+
+  # =========== Game parameters ===========
+  role_player_0: null
+  do_couple: False
+  config_little_girl:
+    cant_see_numbers: True
+    proportion_hidden_words: 0.5
+
+
+
+  # =========== Render parameters ===========
+  print_obs: False
+  print_common_obs: False
+  pause_at_each_obs_print: True
