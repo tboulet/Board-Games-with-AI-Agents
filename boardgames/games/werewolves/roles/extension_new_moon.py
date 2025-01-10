@@ -11,7 +11,7 @@ class RoleSavior(RoleWW):
     def get_name(cls) -> str:
         return "Savior"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -20,7 +20,8 @@ class RoleSavior(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return [Phase.SAVIOR_PHASE]
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
             "The savior is a villager with a special power. The savior can protect a player from the werewolves' attack."
             "Your power are : \n"
@@ -34,7 +35,7 @@ class RoleElder(RoleWW):
     def get_name(cls) -> str:
         return "Elder"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -43,7 +44,8 @@ class RoleElder(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return []
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
             "The elder is a villager with a special power. The elder is protected from one of the werewolves' attack."
             "Your power are : \n"
@@ -57,7 +59,7 @@ class RoleVillageFool(RoleWW):
     def get_name(cls) -> str:
         return "Village Fool"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -66,7 +68,8 @@ class RoleVillageFool(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return []
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
             "The village fool is a player that does not die if he is eliminated by the village (the first time)."
             "Instead, he is publicly revealed as the village fool and can not vote anymore."

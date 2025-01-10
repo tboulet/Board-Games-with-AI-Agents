@@ -8,7 +8,6 @@ from time import sleep
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
 from boardgames.common_obs import CommonObs
 from boardgames.games.werewolves.causes_of_deaths.base_cause import CauseOfDeath
-from boardgames.games.werewolves.causes_of_deaths.classical_causes import CauseVote
 from boardgames.games.werewolves.factions import FactionsWW
 from boardgames.games.werewolves.identity import Identity
 from boardgames.games.werewolves.phase.base_phase import (
@@ -40,16 +39,36 @@ from boardgames.action_spaces import (
 )
 
 
+# Define elementary causes of death
+class CauseVote(CauseOfDeath):
+    def get_name(self):
+        return "Vote"
+
+    def is_day_cause_of_death(self):
+        return True
+
+    def get_message_on_death(self, state: "StateWW", id_player: int) -> str:
+        return f"Player {id_player} was eliminated by the vote."
+
+
+class CauseWolfAttack(CauseOfDeath):
+    def get_name(self):
+        return "Wolf attack"
+
+    def is_day_cause_of_death(self):
+        return False
+
+
 # Define elementary phases
 class PhaseDaySpeech(Phase):
-
+    
     def get_name(self) -> str:
         return "Day Speech"
 
     def is_day_phase(self) -> bool:
         return True
 
-    def play_action(self, state: "StateWW", joint_action: JointAction) -> State:
+    def play_action(self, state: "StateWW", joint_action: JointAction):
         # Treat the speech
         id_player_speaking = state.order_speech[state.idx_speech]
         assert (
@@ -74,17 +93,16 @@ class PhaseDaySpeech(Phase):
                 "All players have spoken, the day is over."
             )
             # Move to the next phase
-            state.game_phases.advance_phase()
+            state.phase_manager.advance_phase()
             if state.turn == 0:
                 assert (
-                    state.game_phases.get_current_phase().get_name() == "Day Vote"
+                    state.phase_manager.get_current_phase().get_name() == "Day Vote"
                 ), "Next phase should be the vote phase."
-                state.game_phases.advance_phase()  # Skip the vote phase the first day
+                state.phase_manager.advance_phase()  # Skip the vote phase the first day
             # Reset the speech variables for good measure
             state.order_speech = None
             state.idx_speech = None
 
-        return state
 
     def return_feedback(self, state: "StateWW") -> Tuple[
         JointReward,
@@ -123,14 +141,14 @@ class PhaseDaySpeech(Phase):
 
 
 class PhaseDayVote(Phase):
-
+    
     def get_name(self) -> str:
         return "Day Vote"
 
     def is_day_phase(self) -> bool:
         return True
 
-    def play_action(self, state: "StateWW", joint_action: JointAction) -> State:
+    def play_action(self, state: "StateWW", joint_action: JointAction):
         report_vote = ""
         vote_count: Dict[int, int] = defaultdict(int)
         list_id_players_alive = [
@@ -177,8 +195,7 @@ class PhaseDayVote(Phase):
         # Eliminate the player and apply consequences
         state.apply_death_consequences(id_target_final, CauseVote())
         # Advance to the next phase
-        state.game_phases.advance_phase()
-        return state
+        state.phase_manager.advance_phase()
 
     def return_feedback(self, state: "StateWW") -> Tuple[
         JointReward,
@@ -230,7 +247,8 @@ class PhaseDayVote(Phase):
 
 
 # Define the manager of phases
-class ManagerPhasesWW:
+class PhasesManagerWW:
+    """Manager of the phases of the Werewolves game. It is responsible for the order of the phases and the transitions between them."""
 
     def __init__(self, list_roles: List[RoleWW]) -> None:
         # Initialize the list of phases as the two base phases
@@ -260,11 +278,12 @@ class ManagerPhasesWW:
         ), "The phases should be dividedd in n day phases followed by m night phases, with n+m = len(list_phases)."
 
     def advance_phase(self) -> None:
+        """Advance to the next phase in the list of phases."""
         self.idx_current_phase = (self.idx_current_phase + 1) % len(self.list_phases)
         print(f"Entering phase {self.list_phases[self.idx_current_phase]}")
 
     def remove_phase(self, phase: Phase) -> None:
-        """Remove a phase from the list of phases. Also modifies the phase index so that it still points to the same phase.
+        """Remove a phase from the list of phases. Also modifies the phase indexes so that it still points to the same phase.
 
         Args:
             phase (Phase): the phase to remove
@@ -299,15 +318,22 @@ class ManagerPhasesWW:
             self.idx_first_night_phase += 1
 
     def get_current_phase(self) -> Phase:
+        """Get the current phase."""
         return self.list_phases[self.idx_current_phase]
 
     def set_current_phase(self, phase: Phase) -> None:
+        """Set the current phase to a specific phase."""
         assert (
             phase in self.list_phases
         ), f"Phase {phase} should be in the list of phases."
         self.idx_current_phase = self.list_phases.index(phase)
 
-    def get_first_night_phase(self) -> Phase:
+    def get_first_night_phase(self) -> Optional[Phase]:
+        """Get the first night phase.
+        The first night phase is the first phase in the list of phases that is a night phase (the list of phases is divided in day phases followed by night phases).
+
+        If there is no night phase but the game continue because there is still more than 2 factions alive, return None.
+        """
         if self.idx_first_night_phase == len(self.list_phases):
             return None
         return self.list_phases[self.idx_first_night_phase]
@@ -335,6 +361,19 @@ class StatusIsWolf(Status):
 
 
 class StateWW(State):
+    """The state of the Werewolves game.
+    It contains all the information about the game at a given time, including :
+        - the number of players
+        - the list of roles
+        - the list of identities
+        - the composition of the game
+        - the phase manager
+        - the list of alive players
+        - variables related to speeches
+        - the night attacks, an object active the night that keeps track of the attacks
+        - the common observation, which manage the observation of each player
+        - other game variables such as the turn, the index of the subphase...
+    """
 
     def __init__(
         self,
@@ -350,8 +389,8 @@ class StateWW(State):
         self.config = kwargs
 
         # Initialize WW game variables
-        self.game_phases = ManagerPhasesWW(list_roles=list_roles)
-        print(f"Phases : {self.game_phases}\n")
+        self.phase_manager = PhasesManagerWW(list_roles=list_roles)
+        print(f"Phases : {self.phase_manager}\n")
         self.done = False
         self.turn = 0
         self.idx_subphase = 0
@@ -360,7 +399,6 @@ class StateWW(State):
         self.idx_speech = None
         self.order_speech_wolf = None
         self.idx_speech_wolf = None
-        self.id_wolf_speaking = None
         self.night_attacks: Dict[int, Set[CauseOfDeath]] = None
         # Initialize common observation
         self.common_obs = CommonObs(n_players=self.n_players)
@@ -378,6 +416,12 @@ class StateWW(State):
                 ),
                 idx_player=id_player,
             )
+        # Inform the wolf players of their identity
+        list_id_wolves = self.get_list_id_wolves_alive()
+        self.common_obs.add_specific_message(
+            f"[Private Wolf Chat] You see the wolves are composed of : {list_id_wolves}.",
+            list_idx_player=list_id_wolves,
+        )
         # Initialize the couple
         if self.config["do_couple"]:
             self.couple = random.sample(range(self.n_players), 2)
@@ -392,6 +436,8 @@ class StateWW(State):
                     ),
                     idx_player=id1,
                 )
+        else:
+            self.couple = None
 
         return
 
@@ -545,6 +591,21 @@ class StateWW(State):
         id_player: int,
         cause: CauseOfDeath,
     ):
+        """Apply the consequences of a player supposed to die of a given cause of death.
+        
+        If the player is not supposed to die, this won't do anything as the player is already dead.
+        
+        It does th following :
+            - apply any events supposed to happen if the player is announced dead, regarding its role, statutes and the cause of death.
+            If the player is not supposed to die because any of these events prevent it, this won't kill the player and stop the process here.
+            - kill the player
+            - inform the board and the player of the death, and publicly reveal its role
+            - apply any events supposed to happen if the  player actually dies, regarding its role, statutes and the cause of death.
+
+        Args:
+            id_player (int): _description_
+            cause (CauseOfDeath): _description_
+        """
         # Skip if the player is already dead
         if not self.list_are_alive[id_player]:
             return
@@ -569,9 +630,13 @@ class StateWW(State):
         if not is_death_confirmed:
             return
 
-        # Kill the player if the role didn't prevent it
+        # Kill the player
         self.list_are_alive[id_player] = False
 
+        # Remove the phase associated with the role of the player
+        for phase in role_eliminated_player.get_associated_phases():
+            self.phase_manager.remove_phase(phase)
+            
         # Inform the board and the player of the death
         if not cause.is_day_cause_of_death():
             self.common_obs.add_global_message(
@@ -599,6 +664,11 @@ class StateWW(State):
     # ===== Getter/Checker methods =====
 
     def is_game_over(self) -> bool:
+        """Check if the game is over for faction reasons, ie. if there is only one faction alive.
+
+        Returns:
+            bool: whether the game is over (for faction reasons : only one faction alive)
+        """
         set_factions_alive = {
             self.identities[i].faction
             for i in range(self.n_players)
@@ -623,7 +693,7 @@ class StateWW(State):
             action_space (ActionsSpace): the action space of the player
 
         Returns:
-            Tuple[ JointReward, JointPlayingInformation, JointObservation, JointActionSpace, bool, Dict, ]: the .step() returns
+            Tuple[JointReward, JointPlayingInformation, JointObservation, JointActionSpace, bool, Dict, ]: the .step() returns
         """
         rewards = [0.0] * self.n_players
         list_is_playing = self.empty_list_except(idx=id_player, value=True, fill=False)
@@ -642,7 +712,20 @@ class StateWW(State):
             {},
         )
 
+    def get_list_id_players_alive(self) -> List[int]:
+        """Return the list of the ids of the players that are still alive in the game.
+
+        Returns:
+            List[int]: the list of the ids of alive players
+        """
+        return [i for i in range(self.n_players) if self.list_are_alive[i]]
+    
     def get_list_id_wolves_alive(self) -> List[int]:
+        """Return the list of the ids of the wolves that are still alive in the game.
+
+        Returns:
+            List[int]: the list of the ids of alive wolves
+        """
         return [
             i
             for i in range(self.n_players)
@@ -652,11 +735,30 @@ class StateWW(State):
             )
         ]
 
+    def get_ids_wolf_victims(self) -> List[int]:
+        ids_wolf_victims = [
+            id_player
+            for id_player, causes in self.night_attacks.items()
+            if CauseWolfAttack() in causes
+        ]
+        assert (
+            len(ids_wolf_victims) <= 1
+        ), "There should be at most one wolf victim. (Not implemented yet)"
+        return ids_wolf_victims
+    
     # ===== Victory returns methods =====
 
     def step_return_victory_remaining_faction(
         self, dont_return_state: bool = True
     ) -> Tuple:
+        """Perform the return feedback step when the game is over for faction reasons (only one faction alive).
+
+        Args:
+            dont_return_state (bool, optional): whether to not include the state in the return. Defaults to True (step_return_feedback returns).
+
+        Returns:
+            Tuple: the .step() returns
+        """
         set_factions_alive = {
             self.identities[i].faction
             for i in range(self.n_players)
@@ -692,8 +794,19 @@ class StateWW(State):
             )
 
     def step_return_victory_of_faction(
-        self, faction: FactionsWW, dont_return_state: bool = True
+        self, faction: Union[FactionsWW, List[FactionsWW]], dont_return_state: bool = True
     ) -> Tuple:
+        """Perform the return feedback step when the game is won by a faction or a group of factions.
+        Winning players will receive a reward of 1.0, losing players will receive a reward of -1.0.
+        In case of a draw, all players will receive a reward of 0.0.
+        
+        Args:
+            faction (Union[FactionsWW, List[FactionsWW]]): the faction or list of factions that won the game
+            dont_return_state (bool, optional): whether to not include the state in the return. Defaults to True (step_return_feedback returns).
+
+        Returns:
+            Tuple: the .step() returns
+        """
         if faction is None:
             rewards = [0.0] * self.n_players
             info = {"result": "Draw"}
@@ -737,6 +850,8 @@ class StateWW(State):
                 info,
             )
 
+    # ===== Helper methods =====
+    
     def empty_list_except(
         self, idx: Union[int, List[int]], value: Any, fill: Any = None
     ) -> List[Any]:

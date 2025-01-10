@@ -73,7 +73,7 @@ class PhaseNightWolfSpeech(Phase):
                 list_idx_player=list_id_wolves,
             )
             # Move to the next phase
-            state.game_phases.advance_phase()
+            state.phase_manager.advance_phase()
             # Reset the speech variables for good measure
             state.order_speech_wolf = None
             state.idx_speech_wolf = None
@@ -177,7 +177,7 @@ class PhaseNightWolfVote(Phase):
         # if not attack_fails:
         #     state.night_attacks[id_target_final].add(CAUSES_OF_DEATH.WOLF_ATTACK)
         # Advance to the next phase
-        state.game_phases.advance_phase()
+        state.phase_manager.advance_phase()
         return state
 
     def return_feedback(self, state: StateWW) -> Tuple[
@@ -222,7 +222,7 @@ class RoleWerewolf(RoleWW):
     def get_name(cls) -> str:
         return "Wolf"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.WEREWOLVES
 
     def get_initial_statutes(self) -> List[Status]:
@@ -231,13 +231,24 @@ class RoleWerewolf(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return [PhaseNightWolfSpeech(), PhaseNightWolfVote()]
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
-            "The werewolves are a minority of the players. They know each other and must eliminate the other villagers to win."
-            "Your power are : \n"
-            "- each night, you can discuss with the other werewolves (one message per werewolf)\n"
-            "- after this discussion, you can vote to eliminate a player. The most voted player will be attacked by the werewolves. If there is a tie, it is broken randomly. Please know that some villager powers can creates a protection for a player (see role descriptions)."
+            "Role: Werewolf. Your objective is to eliminate all Villagers and special roles without being discovered. "
+            "Each night, you secretly collaborate with the other Werewolves to choose a player to eliminate. "
+            "During the day, you must blend in, act innocent, and influence discussions to protect yourself and your allies. "
+            "Key Abilities: "
+            "- Night Kill: Each night, coordinate with fellow Werewolves to select a player to eliminate. "
+            "- Deception: During the day, you must lie, manipulate, and cast suspicion on others to avoid being identified. "
+            "- Team Strategy: Work closely with other Werewolves but avoid making your alliances too obvious. "
+            "Winning Condition: You win when all Villagers and special roles are eliminated, or when the Werewolves equal or outnumber the remaining players. "
+            "Strategic Tips: "
+            "- Accuse others subtly to avoid suspicion. "
+            "- Deflect attention by carefully supporting or opposing popular opinions. "
+            "- Decide when to defend or distance yourself from fellow Werewolves under suspicion to survive longer. "
+            "Blend in, deceive the Villagers, and eliminate them one by one to secure victory."
         )
 
-    def initialize_role(self, state: StateWW):
-        pass
+    @classmethod
+    def get_short_textual_description(cls) -> str:
+        return "The base role of the werewolves. Wakes up at night with the other werewolves to choose a player to eliminate"

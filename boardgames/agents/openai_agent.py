@@ -16,37 +16,37 @@ class OpenAI_Agent(BaseTextAgent):
     is_active: bool = False
     client: OpenAI = None
 
-    def __init__(self, model: str, do_print_reasoning: bool = True):
+    def __init__(self, model: str, do_print_answer_assistant: bool = False):
         self.try_connect()
         self.model = model
-        self.do_print_reasoning = do_print_reasoning
+        self.do_print_answer_assistant = do_print_answer_assistant
         self.messages: List[Dict[str, str]] = []
 
     def act(self, observation: Observation, action_space: ActionsSpace) -> Action:
         # Add the observation (plus available actions) to the messages
-        content = observation + f"\nAction restriction: {action_space.get_textual_restrictions()}"
+        content = f"{observation}\n\nAction restrictions: {action_space.get_textual_restrictions()}"
         self.messages.append({"role": "user", "content": content})
 
         # Get the assistant's answer
         answer_assistant = (
             self.client.chat.completions.create(
-                model=self.model,  # Replace with your preferred model
+                model=self.model,
                 messages=self.messages,
             )
             .choices[0]
             .message.content
         )
-
+        if self.do_print_answer_assistant:
+            print(f"ASSISTANT ANSWER: {answer_assistant}")
+        
         # Add the assistant's answer to the messages
         self.messages.append(
-            {"role": "assistant", "content": f"I play action {answer_assistant}"}
+            {"role": "assistant", "content": answer_assistant}
         )
 
         # Extract the action from the assistant's answer
         action = self.extract_action(answer_assistant, action_space)
         if action is not None:
-            if self.do_print_reasoning:
-                print(f"ASSISTANT ANSWER: {answer_assistant}")
             return action
 
         # Loop until the assistant provides a valid action
@@ -55,7 +55,13 @@ class OpenAI_Agent(BaseTextAgent):
             self.messages.append(
                 {
                     "role": "system",
-                    "content": f"You chose an invalid action: {action}. Please respect these restrictions: {action_space.get_textual_restrictions()} and answer in the following format: 'Reasonning : <your reasonning>\nAction:\n<your action>'",
+                    "content": (
+                        f"You chose an invalid action: {action}. "
+                        f"Please respect these restrictions: {action_space.get_textual_restrictions()} "
+                        "and answer in the following format: 'Reasoning : <your reasoning>\nAction: <your action>'\n\n"
+                        "For example: 'Reasoning : I think that ... and I should vote player 3\nAction: 3'"
+                        ,
+                    )
                 }
             )
             answer_assistant = (
@@ -66,11 +72,11 @@ class OpenAI_Agent(BaseTextAgent):
                 .choices[0]
                 .message.content
             )
+            if self.do_print_answer_assistant:
+                print(f"ASSISTANT ANSWER: {answer_assistant}")
             action = self.extract_action(answer_assistant, action_space)
             if action is not None:
                 print("Solved : the assistant corrected itself and provided a valid action.")
-                if self.do_print_reasoning:
-                    print(f"Reasonning of agent: {answer_assistant}")
                 return action
 
         raise ValueError(f"Assistant provided an invalid action 10 times in a row : \n\n{answer_assistant=}, \n\n{action_space=}, \n\n{self.messages=}")

@@ -20,7 +20,8 @@ class RoleInvisible(RoleWW):
         ), "An invisible role should have the phase INVISIBLE_PHASE"
         super().__init__()
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
             f"You are the role {self}. You win with the faction {self.get_initial_faction()}. \n\n"
             "As an invisible role, you have the following caracteristics : \n"
@@ -54,7 +55,7 @@ class RoleLittleGirl(RoleInvisible):
     def get_name(cls) -> str:
         return "Little Girl"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -101,7 +102,7 @@ class RolePerfidiousWolf(RoleInvisible):
     def get_name(cls) -> str:
         return "Perfidious Wolf"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.WEREWOLVES
 
     def get_initial_statutes(self) -> List[Status]:
@@ -126,7 +127,7 @@ class RoleSpirit(RoleInvisible):
     def get_name(cls) -> str:
         return "Spirit"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.SPIRIT
 
     def get_initial_statutes(self) -> List[Status]:

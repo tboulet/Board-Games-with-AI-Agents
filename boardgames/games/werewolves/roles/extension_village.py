@@ -12,7 +12,7 @@ class RoleCrow(RoleWW):
     def get_name(cls) -> str:
         return "Crow"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -21,7 +21,8 @@ class RoleCrow(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return [Phase.CROW_PHASE]
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return "The crow is a player that designates one player each night. This player will receive 2 additional votes during the day."
 
 
@@ -31,7 +32,7 @@ class RoleWhiteWolf(RoleWW):
     def get_name(cls) -> str:
         return "White Wolf"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.WHITE_WOLF
 
     def get_initial_statutes(self) -> List[Status]:
@@ -40,7 +41,8 @@ class RoleWhiteWolf(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return [Phase.WHITE_WOLF_ATTACK]
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return (
             "The white wolf is a member of the wolves that is secretely a traitor and that must win alone."
             "Your power are : \n"
@@ -54,7 +56,7 @@ class RolePyromancer(RoleWW):
     def get_name(cls) -> str:
         return "Pyromancer"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -63,7 +65,8 @@ class RolePyromancer(RoleWW):
     def get_associated_phases(self) -> List[str]:
         return [Phase.PYROMANCER_PHASE]
 
-    def get_textual_description(self) -> str:
+    @classmethod
+    def get_textual_description(cls) -> str:
         return "The pyromancer is a villager that can each night choose a player that won't be able to use its power this night day."
 
     def get_exception_phases(self) -> List[Phase]:

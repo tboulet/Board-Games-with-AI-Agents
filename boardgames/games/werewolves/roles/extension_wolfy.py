@@ -12,7 +12,7 @@ class RoleGravedigger(RoleWW):
     def get_name(cls) -> str:
         return "Gravedigger"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -34,7 +34,7 @@ class RoleRedRidingHood(RoleWW):
     def get_name(cls) -> str:
         return "Red Riding Hood"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
@@ -57,7 +57,7 @@ class RoleMercenary(RoleWW):
     def get_name(cls) -> str:
         return "Mercenary"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.MERCENARY
 
     def get_initial_statutes(self) -> List[Status]:
@@ -76,7 +76,7 @@ class RoleNecromancer(RoleWW):
     def get_name(cls) -> str:
         return "Necromancer"
 
-    def get_initial_faction(self) -> FactionsWW:
+    def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
