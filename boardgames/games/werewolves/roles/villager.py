@@ -24,6 +24,7 @@ class RoleVillager(RoleWW):
     def get_name(cls) -> str:
         return "Villager"
 
+    @classmethod
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 

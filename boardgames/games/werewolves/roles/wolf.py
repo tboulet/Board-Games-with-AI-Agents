@@ -4,7 +4,7 @@ from typing import List, Tuple
 from boardgames.games.werewolves.factions import FactionsWW
 from boardgames.games.werewolves.phase.base_phase import Phase
 from boardgames.games.werewolves.roles.base_role import RoleWW
-from boardgames.games.werewolves.state import StateWW, StatusIsWolf
+from boardgames.games.werewolves.state import CauseWolfAttack, StateWW, StatusIsWolf
 from boardgames.games.werewolves.statutes.base_status import Status
 from boardgames.types import JointAction
 from boardgames.action_spaces import (
@@ -153,6 +153,10 @@ class PhaseNightWolfVote(Phase):
             f"[Private Wolf Chat] The wolves have chosen their target : player {id_target_final}.",
             list_idx_player=list_id_wolves_alive,
         )
+        state.common_obs.log(
+            f"The wolves have chosen their target : player {id_target_final}.",
+            "ACTION",
+        )
         # Check if the target is protected
         attack_fails = False
         # if state.identities[id_target_final].have_status(
@@ -174,8 +178,8 @@ class PhaseNightWolfVote(Phase):
         # ):
         #     attack_fails = True
         # # Add the target to the list of deaths
-        # if not attack_fails:
-        #     state.night_attacks[id_target_final].add(CAUSES_OF_DEATH.WOLF_ATTACK)
+        if not attack_fails:
+            state.night_attacks[id_target_final].add(CauseWolfAttack())
         # Advance to the next phase
         state.phase_manager.advance_phase()
         return state
@@ -222,6 +226,7 @@ class RoleWerewolf(RoleWW):
     def get_name(cls) -> str:
         return "Wolf"
 
+    @classmethod
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.WEREWOLVES
 

@@ -51,10 +51,23 @@ def main(config: DictConfig):
     np.random.seed(seed)
     print(f"Using seed: {seed}")
 
+    # Initialize loggers
+    run_name = f"[{agents_name}]_[{game_name}]_{datetime.datetime.now().strftime('%dth%mmo_%Hh%Mmin%Ss')}_seed{seed}"
+    os.makedirs("logs", exist_ok=True)
+    print(f"\nStarting run {run_name}")
+    if do_wandb:
+        run = wandb.init(
+            name=run_name,
+            config=config,
+            **config["wandb_config"],
+        )
+    if do_tb:
+        tb_writer = SummaryWriter(log_dir=f"tensorboard/{run_name}")
+        
     # Create the game
     print("Creating the game...")
     GameClass = game_name_to_GameClass[game_name]
-    game = GameClass(**config["game"]["config"])
+    game = GameClass(**config["game"]["config"], seed=seed, run_name=run_name)
     n_players = game.get_n_players()
 
     # Get the agents
@@ -73,19 +86,6 @@ def main(config: DictConfig):
         game_context = game.get_game_context()
         for agent in agents_text_based:
             agent.set_game_context(game_context)
-
-    # Initialize loggers
-    run_name = f"[{agents_name}]_[{game_name}]_{datetime.datetime.now().strftime('%dth%mmo_%Hh%Mmin%Ss')}_seed{seed}"
-    os.makedirs("logs", exist_ok=True)
-    print(f"\nStarting run {run_name}")
-    if do_wandb:
-        run = wandb.init(
-            name=run_name,
-            config=config,
-            **config["wandb_config"],
-        )
-    if do_tb:
-        tb_writer = SummaryWriter(log_dir=f"tensorboard/{run_name}")
 
     # Game loop
     print("\nStarting the game loop...")

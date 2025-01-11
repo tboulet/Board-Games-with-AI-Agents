@@ -61,7 +61,7 @@ class CauseWolfAttack(CauseOfDeath):
 
 # Define elementary phases
 class PhaseDaySpeech(Phase):
-    
+
     def get_name(self) -> str:
         return "Day Speech"
 
@@ -103,7 +103,6 @@ class PhaseDaySpeech(Phase):
             state.order_speech = None
             state.idx_speech = None
 
-
     def return_feedback(self, state: "StateWW") -> Tuple[
         JointReward,
         JointPlayingInformation,
@@ -141,7 +140,7 @@ class PhaseDaySpeech(Phase):
 
 
 class PhaseDayVote(Phase):
-    
+
     def get_name(self) -> str:
         return "Day Vote"
 
@@ -192,6 +191,7 @@ class PhaseDayVote(Phase):
             state.common_obs.add_global_message(
                 f"The most voted player will be eliminated : {id_target_final}."
             )
+        state.common_obs.log(f"Player {id_target_final} is eliminated by the vote.")
         # Eliminate the player and apply consequences
         state.apply_death_consequences(id_target_final, CauseVote())
         # Advance to the next phase
@@ -250,8 +250,9 @@ class PhaseDayVote(Phase):
 class PhasesManagerWW:
     """Manager of the phases of the Werewolves game. It is responsible for the order of the phases and the transitions between them."""
 
-    def __init__(self, list_roles: List[RoleWW]) -> None:
+    def __init__(self, list_roles: List[RoleWW], state: "StateWW") -> None:
         # Initialize the list of phases as the two base phases
+        self.state = state
         self.list_phases: List[Phase] = [
             PhaseDaySpeech(),
             PhaseDayVote(),
@@ -259,7 +260,11 @@ class PhasesManagerWW:
         # Collect the phases associated with the roles in the composition
         set_phases_from_roles: Set[Phase] = set()
         for role in list_roles:
-            set_phases_from_roles.update(role.get_associated_phases())
+            phases_associated = role.get_associated_phases()
+            assert all(
+                [p.get_name() in LIST_NAMES_PHASES_ORDERED for p in phases_associated]
+            ), f"Names of the phases associated with role {role} ({phases_associated}) should be in LIST_NAMES_PHASES_ORDERED. Please add them in LIST_NAMES_PHASES_ORDERED."
+            set_phases_from_roles.update(phases_associated)
         # Extend the list of phases with the phases associated with the roles in the order of the list of phases
         for name_phase in LIST_NAMES_PHASES_ORDERED:
             for phase in set_phases_from_roles:
@@ -268,19 +273,22 @@ class PhasesManagerWW:
         # Initialize the indexes
         self.idx_current_phase = 0
         self.idx_first_night_phase = len(
-            [phase for phase in self.list_phases if phase.is_day_phase]
+            [phase for phase in self.list_phases if phase.is_day_phase()]
         )
         assert all(
             [
-                self.list_phases[i].is_day_phase
+                self.list_phases[i].is_day_phase()
                 for i in range(self.idx_first_night_phase)
             ]
         ), "The phases should be dividedd in n day phases followed by m night phases, with n+m = len(list_phases)."
 
     def advance_phase(self) -> None:
         """Advance to the next phase in the list of phases."""
+        idx_previous_phase = deepcopy(self.idx_current_phase)
         self.idx_current_phase = (self.idx_current_phase + 1) % len(self.list_phases)
-        print(f"Entering phase {self.list_phases[self.idx_current_phase]}")
+        self.state.common_obs.log(
+            f"{self.list_phases[idx_previous_phase]} --> {self.list_phases[self.idx_current_phase]}"
+        )
 
     def remove_phase(self, phase: Phase) -> None:
         """Remove a phase from the list of phases. Also modifies the phase indexes so that it still points to the same phase.
@@ -292,8 +300,12 @@ class PhasesManagerWW:
             self.list_phases.count(phase) <= 1
         ), f"Phase {phase} to remove should be present only 0 or 1 times, but it is present {self.list_phases.count(phase)} times."
         if self.list_phases.count(phase) == 0:
+            self.state.common_obs.log(
+                f"Attempting removing phase {phase}... but it is not present in the list of phases."
+            )
             return  # nothing to do
         else:
+            self.state.common_obs.log(f"Attempting removing phase {phase}... REMOVED.")
             idx_phase_to_remove = self.list_phases.index(phase)
             assert (
                 idx_phase_to_remove != self.idx_current_phase
@@ -302,7 +314,7 @@ class PhasesManagerWW:
             # Update the index of the current phase and the first night phase
             if idx_phase_to_remove <= self.idx_current_phase:
                 self.idx_current_phase -= 1
-            if phase.is_day_phase:
+            if phase.is_day_phase():
                 self.idx_first_night_phase -= 1
 
     def insert_phase(self, phase: Phase) -> None:
@@ -313,8 +325,11 @@ class PhasesManagerWW:
         """
         idx_next_phase = (self.idx_current_phase + 1) % len(self.list_phases)
         self.list_phases.insert(idx_next_phase, phase)
+        self.state.common_obs.log(
+            f"[!] Inserted phase {phase} at index {idx_next_phase} (after current phase {self.list_phases[self.idx_current_phase]})."
+        )
         # Update the index of the first night phase
-        if phase.is_day_phase:
+        if phase.is_day_phase():
             self.idx_first_night_phase += 1
 
     def get_current_phase(self) -> Phase:
@@ -326,6 +341,10 @@ class PhasesManagerWW:
         assert (
             phase in self.list_phases
         ), f"Phase {phase} should be in the list of phases."
+        self.state.common_obs.log(
+            f"[!] Set current phase to {phase} (was {self.list_phases[self.idx_current_phase]})."
+        )
+        # Update the index of the current phase
         self.idx_current_phase = self.list_phases.index(phase)
 
     def get_first_night_phase(self) -> Optional[Phase]:
@@ -388,9 +407,24 @@ class StateWW(State):
         self.identities = identities
         self.config = kwargs
 
+        # Initialize common observation
+        log_dir = kwargs.get("log_dir", None)
+        run_name = kwargs["run_name"]
+        if log_dir is not None:
+            log_file = f"{log_dir}/{run_name}.log"
+            log_file_last = f"{log_dir}/last.log"
+            list_log_files = [log_file, log_file_last]
+            config_log = kwargs.get("config_log", {})
+            self.common_obs = CommonObs(
+                n_players=self.n_players,
+                list_log_files=list_log_files,
+                config_log=config_log,
+            )
+        else:
+            self.common_obs = CommonObs(n_players=self.n_players)
+
         # Initialize WW game variables
-        self.phase_manager = PhasesManagerWW(list_roles=list_roles)
-        print(f"Phases : {self.phase_manager}\n")
+        self.phase_manager = PhasesManagerWW(list_roles=list_roles, state=self)
         self.done = False
         self.turn = 0
         self.idx_subphase = 0
@@ -400,12 +434,12 @@ class StateWW(State):
         self.order_speech_wolf = None
         self.idx_speech_wolf = None
         self.night_attacks: Dict[int, Set[CauseOfDeath]] = None
-        # Initialize common observation
-        self.common_obs = CommonObs(n_players=self.n_players)
+
+        # Send first messages
         self.common_obs.add_global_message("The game has started.")
-        compo_pretty = {k: v["n"] for k, v in compo.items()}
+        description_compo_listing = self.get_compo_listing()
         self.common_obs.add_global_message(
-            f"The composition of the game is : {compo_pretty}."
+            f"The composition of the game is : \n{description_compo_listing}"
         )
         for id_player, identity in enumerate(self.identities):
             self.common_obs.add_message(
@@ -592,9 +626,9 @@ class StateWW(State):
         cause: CauseOfDeath,
     ):
         """Apply the consequences of a player supposed to die of a given cause of death.
-        
+
         If the player is not supposed to die, this won't do anything as the player is already dead.
-        
+
         It does th following :
             - apply any events supposed to happen if the player is announced dead, regarding its role, statutes and the cause of death.
             If the player is not supposed to die because any of these events prevent it, this won't kill the player and stop the process here.
@@ -608,6 +642,9 @@ class StateWW(State):
         """
         # Skip if the player is already dead
         if not self.list_are_alive[id_player]:
+            self.common_obs.log(
+                f"[!] Player {id_player} was supposed to die but is already dead."
+            )
             return
 
         role_eliminated_player = self.identities[id_player].role
@@ -619,24 +656,38 @@ class StateWW(State):
             self, id_player, cause
         ):
             is_death_confirmed = False
-            raise
+            self.common_obs.log(
+                f"[!] Player {id_player} was supposed to die but their role {role_eliminated_player} prevented it."
+            )
+        if not cause.apply_death_announcement_and_confirm(self, id_player):
+            is_death_confirmed = False
+            self.common_obs.log(
+                f"[!] Player {id_player} was supposed to die but the cause of death {cause} prevented it."
+            )
         for status in statutes_eliminated_player:
             if not status.apply_death_announcement_and_confirm(self, id_player, cause):
                 is_death_confirmed = False
-                raise
-        if not cause.apply_death_announcement_and_confirm(self, id_player):
-            is_death_confirmed = False
-            breakpoint()
+                self.common_obs.log(
+                    f"[!] Player {id_player} was supposed to die but their status {status} prevented it."
+                )
         if not is_death_confirmed:
             return
 
         # Kill the player
         self.list_are_alive[id_player] = False
+        self.common_obs.log(
+            f"Player {id_player} has died of {cause}. Role : {role_eliminated_player}."
+        )
 
-        # Remove the phase associated with the role of the player
+        # Remove the phase associated with the role of the player if no other alive roles have it
         for phase in role_eliminated_player.get_associated_phases():
-            self.phase_manager.remove_phase(phase)
-            
+            if not any(
+                phase in self.identities[i].role.get_associated_phases()
+                and self.list_are_alive[i]
+                for i in range(self.n_players)
+            ):
+                self.phase_manager.remove_phase(phase)
+
         # Inform the board and the player of the death
         if not cause.is_day_cause_of_death():
             self.common_obs.add_global_message(
@@ -656,9 +707,9 @@ class StateWW(State):
 
         # Deal with special cases of consequences of the death
         role_eliminated_player.apply_death_consequences(self, id_player, cause)
+        cause.apply_death_consequences(self, id_player)
         for status in statutes_eliminated_player:
             status.apply_death_consequences(self, id_player, cause)
-        cause.apply_death_consequences(self, id_player)
         return
 
     # ===== Getter/Checker methods =====
@@ -674,7 +725,13 @@ class StateWW(State):
             for i in range(self.n_players)
             if self.list_are_alive[i]
         }
-        return len(set_factions_alive) <= 1
+        if len(set_factions_alive) <= 1:
+            self.common_obs.log(
+                f"[!] Game is over for faction reasons : remaining factions {set_factions_alive}."
+            )
+            return True
+        else:
+            return False
 
     def get_return_feedback_one_player(
         self, id_player: int, action_space: ActionsSpace
@@ -719,7 +776,7 @@ class StateWW(State):
             List[int]: the list of the ids of alive players
         """
         return [i for i in range(self.n_players) if self.list_are_alive[i]]
-    
+
     def get_list_id_wolves_alive(self) -> List[int]:
         """Return the list of the ids of the wolves that are still alive in the game.
 
@@ -745,7 +802,7 @@ class StateWW(State):
             len(ids_wolf_victims) <= 1
         ), "There should be at most one wolf victim. (Not implemented yet)"
         return ids_wolf_victims
-    
+
     # ===== Victory returns methods =====
 
     def step_return_victory_remaining_faction(
@@ -772,6 +829,7 @@ class StateWW(State):
             self.common_obs.add_global_message(
                 "All players are dead. The game is a draw."
             )
+            self.common_obs.log("[!] All players are dead. The game is a draw.")
             return self.step_return_victory_of_faction(
                 self, None, dont_return_state=dont_return_state
             )
@@ -785,6 +843,9 @@ class StateWW(State):
             self.common_obs.add_global_message(
                 f"All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
             )
+            self.common_obs.log(
+                f"[!] All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
+            )
             return self.step_return_victory_of_faction(
                 faction_winner, dont_return_state=dont_return_state
             )
@@ -794,12 +855,14 @@ class StateWW(State):
             )
 
     def step_return_victory_of_faction(
-        self, faction: Union[FactionsWW, List[FactionsWW]], dont_return_state: bool = True
+        self,
+        faction: Union[FactionsWW, List[FactionsWW]],
+        dont_return_state: bool = True,
     ) -> Tuple:
         """Perform the return feedback step when the game is won by a faction or a group of factions.
         Winning players will receive a reward of 1.0, losing players will receive a reward of -1.0.
         In case of a draw, all players will receive a reward of 0.0.
-        
+
         Args:
             faction (Union[FactionsWW, List[FactionsWW]]): the faction or list of factions that won the game
             dont_return_state (bool, optional): whether to not include the state in the return. Defaults to True (step_return_feedback returns).
@@ -851,7 +914,7 @@ class StateWW(State):
             )
 
     # ===== Helper methods =====
-    
+
     def empty_list_except(
         self, idx: Union[int, List[int]], value: Any, fill: Any = None
     ) -> List[Any]:
@@ -871,3 +934,30 @@ class StateWW(State):
         for i in idx:
             list[i] = value
         return list
+
+    def get_compo_listing(self) -> str:
+        compo_listing = ""
+        role_name_to_n_and_RoleClass: Dict[str, Tuple[int, Type[RoleWW]]] = defaultdict(
+            lambda: (0, None)
+        )
+        list_ids_players_alive = self.get_list_id_players_alive()
+        for id_player in list_ids_players_alive:
+            role = self.identities[id_player].role
+            role_name = role.get_name()
+            # extract the class from the instance
+            RoleClass = type(role)
+            n, _ = role_name_to_n_and_RoleClass[role_name]
+            role_name_to_n_and_RoleClass[role_name] = (n + 1, RoleClass)
+        for i, (role_name, (n, RoleClass)) in enumerate(
+            sorted(
+                role_name_to_n_and_RoleClass.items(),
+                key=lambda x: x[1][1].get_initial_faction().value,
+            )
+        ):  # sort by faction name
+            if n == 1:
+                compo_listing += f"- {role_name} (faction {RoleClass.get_initial_faction()}) : {RoleClass.get_short_textual_description()}"
+            elif n > 1:
+                compo_listing += f"- {role_name} (faction {RoleClass.get_initial_faction()}) ({n} times) : {RoleClass.get_short_textual_description()}"
+            if i != len(role_name_to_n_and_RoleClass) - 1:
+                compo_listing += "\n"  # add a new line if not the last role
+        return compo_listing

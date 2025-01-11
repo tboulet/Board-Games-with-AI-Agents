@@ -11,6 +11,8 @@ config:
       n: 1
     Witch:
       n: 1
+    Hunter:
+      n: 1
     # Abominable Sectarian:
     #   n: 1
     # Angel: 
@@ -39,7 +41,13 @@ config:
 
 
 
-  # =========== Render parameters ===========
+  # =========== Render/logging parameters ===========
+  log_dir: logs_ww
+  config_log:
+    # log_format: "(%(asctime)s) %(message)s"
+    log_format: "%(message)s"
+    do_log_messages: True
+    do_log_infos: True
   print_obs: False
   print_common_obs: False
   pause_at_each_obs_print: True

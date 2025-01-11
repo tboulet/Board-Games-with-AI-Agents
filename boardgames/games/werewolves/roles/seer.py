@@ -26,7 +26,7 @@ from boardgames.types import (
 class PhaseSeer(Phase):
 
     def get_name(self) -> str:
-        return "Seer phase"
+        return "Seer Phase"
 
     def play_action(self, state: StateWW, joint_action: JointAction) -> StateWW:
         id_target_seer: int = joint_action[self.id_player]
@@ -63,7 +63,7 @@ class PhaseSeer(Phase):
         )
         action_space = FiniteActionSpace(actions=list_id_targets)
         return state.get_return_feedback_one_player(
-            state=state, id_player=self.id_player, action_space=action_space
+            id_player=self.id_player, action_space=action_space
         )
 
     def is_day_phase(self) -> bool:
@@ -75,6 +75,7 @@ class RoleSeer(RoleWW):
     def get_name(cls) -> str:
         return "Seer"
 
+    @classmethod
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 

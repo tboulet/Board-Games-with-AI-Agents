@@ -58,16 +58,9 @@ class WerewolvesGame(BaseTextBasedGame):
         self.n_players = n_players
         self.compo = compo
         self.config = kwargs
-
+    
     def get_game_context(self) -> str:
-        compo_pretty = {k: v["n"] for k, v in self.compo.items()}
-        compo_description = "Composition of the game:\n"
-        for role_name, n in compo_pretty.items():
-            RoleClass = ROLES_CLASSES_WW[role_name]
-            if n == 1:
-                compo_description += f"- {role_name} : {RoleClass.get_short_textual_description()}\n"
-            elif n > 1:
-                compo_description += f"- {role_name} ({n} times) : {RoleClass.get_short_textual_description()}\n"
+        compo_listing = self.initial_compo_listing
         context = f"""
 You will play a game of Werewolf. 
 
@@ -88,7 +81,8 @@ The game alternates between two phases:
 
 [COMPOSITION OF THE GAME] 
 This is the composition of the game. You should pay attention to which roles are present since this could influence your strategy.
-{compo_description}
+Composition of the game:
+{compo_listing}
 
 Victory Conditions:
 - Villagers win when all the Werewolves are eliminated.
@@ -135,7 +129,7 @@ Good luck!
     ]:
 
         # Create roles
-        list_roles = []
+        list_roles : List[RoleWW] = []
         for role_name, role_config_full in self.compo.items():
             role_config = deepcopy(role_config_full)
             n = role_config.pop("n")
@@ -151,13 +145,11 @@ Good luck!
         assert (
             len(list_roles) == self.n_players
         ), "The number of roles must match the number of players."
-        print(f"Roles : {list_roles}\n")
         # Create identities
-        identities = []
+        identities : List[Identity] = []
         for id_player, role in enumerate(list_roles):
             identity = Identity(role, id_player)
             identities.append(identity)
-        print(f"Identities : {identities}\n")
         # Set the role of player 0 as role_player_0
         if "role_player_0" in self.config and self.config["role_player_0"] is not None:
             id_role_desired = [
@@ -181,9 +173,14 @@ Good luck!
             compo=self.compo,
             **self.config,
         )
+        state.common_obs.log(f"Roles : {list_roles}\n")
+        state.common_obs.log(f"Phases : {state.phase_manager}\n")
+        state.common_obs.log(f"Identities : {identities}\n")
 
+        # Get initial compo listing
+        self.initial_compo_listing = state.get_compo_listing()
+        
         # Initialize role specific variables
-        print(f"Initializing roles...")
         for identity in identities:
             identity.role.initialize_role(state)
 
@@ -260,7 +257,7 @@ Good luck!
             joint_action (JointAction): the list of actions of the players
         """
         phase = state.phase_manager.get_current_phase()
-        print(
+        state.common_obs.log(
             f"Playing actions for phase {phase}.{state.idx_subphase} of turn {state.turn}..."
         )
         phase.play_action(state, joint_action)
@@ -297,13 +294,18 @@ Good luck!
         if first_night_phase is None:
             # No more nights, continuing the game
             state.night_attacks = defaultdict(set)
+            state.common_obs.log("[!] No more nights, continuing the game.")
         elif first_night_phase == phase and state.idx_subphase == 0:
             # New night, announce the night and initialize night variables
+            state.common_obs.add_global_message(
+                f"The composition of the remaining players is :\n{state.get_compo_listing()}"
+            )
             state.common_obs.add_global_message(
                 f"The village is now going to sleep for night {state.turn+1}."
             )
             # Initialize night variables
             state.night_attacks = defaultdict(set)
+            state.common_obs.log(f"[!] New night, initializing night variables.")
 
         # # Check if this phase is related to a player that has the Pyromancer status, and in this case, skip it
         # list_ids_pyromancer = self.get_id_player_with_role(
@@ -527,15 +529,14 @@ Good luck!
             state (State): the current state of the game
         """
         if self.config["print_common_obs"]:
-            print(state.common_obs)
+            state.common_obs.log(state.common_obs)
 
         if self.config["print_obs"]:
             if state.done:
-                print(f"The game is over : {state.common_obs}")
+                state.common_obs.log(f"The game is over : {state.common_obs}")
             else:
                 for i in range(self.n_players):
                     if list_is_playing[i]:
-                        print(f"\n>>> Player {i} is playing :")
-                        print(f"{state.common_obs[i]}")
+                        state.common_obs.log(f"\n>>> Player {i} is playing :\n{state.common_obs[i]}")
                         if self.config["pause_at_each_obs_print"]:
                             input("Press any key to continue...")

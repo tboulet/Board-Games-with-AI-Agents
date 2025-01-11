@@ -1,6 +1,7 @@
 from collections import defaultdict
 import random
 from typing import List, Tuple
+from boardgames.games.werewolves.causes_of_deaths.base_cause import CauseOfDeath
 from boardgames.games.werewolves.factions import FactionsWW
 from boardgames.games.werewolves.phase.base_phase import Phase
 from boardgames.games.werewolves.roles.base_role import RoleWW
@@ -23,14 +24,13 @@ from boardgames.types import (
 )
 
 
-
 class Phase
 
     def __init__(self,
         
     def get_name(self) -> str:
 
-    def play_action(self, state: StateWW, joint_action: JointAction) -> StateWW:
+    def play_action(self, state: StateWW, joint_action: JointAction):
         
         # Advance to the next phase
         state.phase_manager.advance_phase()
@@ -64,7 +64,11 @@ class Role
         return []
 
     @classmethod
-def get_textual_description(cls) -> str:
+    def get_textual_description(cls) -> str:
         return (
             
         )
+        
+    @classmethod
+    def get_short_textual_description(cls):
+        return 

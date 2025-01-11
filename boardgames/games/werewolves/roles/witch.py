@@ -35,7 +35,7 @@ class CauseKillPotion(CauseOfDeath):
 class PhaseWitch(Phase):
 
     def get_name(self) -> str:
-        return "Witch phase"
+        return "Witch Phase"
 
     def play_action(self, state: StateWW, joint_action: JointAction):
         action_witch: str = joint_action[self.id_player]
@@ -48,7 +48,7 @@ class PhaseWitch(Phase):
         elif action_witch == "Save":
             assert state.night_attacks, "No player to save."
             role_witch.has_save_potion = False
-            id_player_victim = state.get_ids_wolf_victims(state)[0]
+            id_player_victim = state.get_ids_wolf_victims()[0]
             for cause_of_death_wolf in [
                 CauseWolfAttack(),
             ]:
@@ -57,6 +57,10 @@ class PhaseWitch(Phase):
                 f"You have chosen to use your save potion on player {id_player_victim}.",
                 idx_player=self.id_player,
             )
+            state.common_obs.log(
+                f"[!] Witch saved player {id_player_victim} from the wolves.",
+                "ACTION",
+            )
         elif action_witch.startswith("Kill"):
             role_witch.has_kill_potion = False
             id_target_witch = int(action_witch.split(" ")[1])
@@ -64,6 +68,10 @@ class PhaseWitch(Phase):
             state.common_obs.add_message(
                 f"You have chosen to use your kill potion on player {id_target_witch}.",
                 idx_player=self.id_player,
+            )
+            state.common_obs.log(
+                f"[!] Witch killed player {id_target_witch}.",
+                "ACTION",
             )
         else:
             raise ValueError(f"Invalid action for the witch : {action_witch}.")
@@ -120,7 +128,7 @@ class PhaseWitch(Phase):
         # Propose the witch to choose a player to kill (if the witch has the death potion)
         if role_witch.has_kill_potion:
             list_actions_kill = []
-            for i in range(self.n_players):
+            for i in range(state.n_players):
                 if (
                     state.list_are_alive[i]
                     and (i != self.id_player)
@@ -158,6 +166,7 @@ class RoleWitch(RoleWW):
     def get_name(cls) -> str:
         return "Witch"
 
+    @classmethod
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 

@@ -7,28 +7,6 @@ from boardgames.games.werewolves.statutes.base_status import Status
 from boardgames.types import JointAction
 
 
-class RoleSeer(RoleWW):
-    @classmethod
-    def get_name(cls) -> str:
-        return "Seer"
-
-    def get_initial_faction(cls) -> FactionsWW:
-        return FactionsWW.VILLAGE
-
-    def get_initial_statutes(self) -> List[Status]:
-        return []
-
-    def get_associated_phases(self) -> List[str]:
-        return [Phase.SEER_PHASE]
-
-    @classmethod
-    def get_textual_description(cls) -> str:
-        return (
-            "The seer is a villager with a special power. Each night, the seer can choose a player to see its role. The seer can use this information to help the villagers."
-            "Your power are : \n"
-            "- each night, you can choose a player to see its role."
-        )
-
 
 class RoleWitch(RoleWW):
 
@@ -103,10 +81,3 @@ class RoleThief(RoleWW):
             "- once per game, you can choose a player to steal his role when he dies. When he dies, you will become this role."
         )
 
-
-ROLES_ORIGINAL = {
-    RoleSeer.get_name(): RoleSeer,
-    RoleWitch.get_name(): RoleWitch,
-    RoleHunter.get_name(): RoleHunter,
-    RoleThief.get_name(): RoleThief,
-}
