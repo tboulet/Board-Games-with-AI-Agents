@@ -48,7 +48,7 @@ class Phase(ABC):
         Args:
             id_player (Optional[int], optional): the id of the player playing in this phase. Defaults to None.
         """
-        self.id_player : int = id_player
+        self.id_player: int = id_player
 
     # ==== Interface methods to implement ====
 
@@ -126,12 +126,13 @@ class Phase(ABC):
 
     def __hash__(self):
         return hash(self.get_name())
-    
+
+
 LIST_NAMES_PHASES_ORDERED = [
     "Day Speech",
     "Day Vote",
     "Victory Check",
-    "Savior Phase",
+    "Bodyguard Phase",
     "Night Wolf Speech",
     "Night Wolf Vote",
     "Infection Phase",

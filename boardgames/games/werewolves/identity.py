@@ -25,8 +25,8 @@ class Identity:
         self.statutes = self.role.get_initial_statutes()
         self.id_player = id_player
         self.role.set_id_player(id_player)
-        
-    def have_status(self, status: List[Status]) -> bool:
+
+    def has_status(self, status: List[Status]) -> bool:
         """Return whether the player has the given status or not.
 
         Args:

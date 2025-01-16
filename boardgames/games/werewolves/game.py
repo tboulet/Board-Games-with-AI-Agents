@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Set, Tuple, Type, Union
 import numpy as np
 from boardgames.games.base_game import BaseGame
 from boardgames.games.base_text_game import BaseTextBasedGame
-from boardgames.games.werewolves.causes_of_deaths.base_cause import CauseOfDeath
 from boardgames.games.werewolves.factions import FactionsWW
 from boardgames.games.werewolves.phase.base_phase import Phase
 from boardgames.types import (
@@ -58,7 +57,7 @@ class WerewolvesGame(BaseTextBasedGame):
         self.n_players = n_players
         self.compo = compo
         self.config = kwargs
-    
+
     def get_game_context(self) -> str:
         compo_listing = self.initial_compo_listing
         context = f"""
@@ -129,7 +128,7 @@ Good luck!
     ]:
 
         # Create roles
-        list_roles : List[RoleWW] = []
+        list_roles: List[RoleWW] = []
         for role_name, role_config_full in self.compo.items():
             role_config = deepcopy(role_config_full)
             n = role_config.pop("n")
@@ -146,7 +145,7 @@ Good luck!
             len(list_roles) == self.n_players
         ), "The number of roles must match the number of players."
         # Create identities
-        identities : List[Identity] = []
+        identities: List[Identity] = []
         for id_player, role in enumerate(list_roles):
             identity = Identity(role, id_player)
             identities.append(identity)
@@ -179,7 +178,7 @@ Good luck!
 
         # Get initial compo listing
         self.initial_compo_listing = state.get_compo_listing()
-        
+
         # Initialize role specific variables
         for identity in identities:
             identity.role.initialize_role(state)
@@ -263,9 +262,6 @@ Good luck!
         phase.play_action(state, joint_action)
         return
 
-        
-        
-
     def step_deals_with_new_phase(self, state: StateWW) -> Tuple[
         JointReward,
         JointPlayingInformation,
@@ -339,8 +335,6 @@ Good luck!
         #             return self.step_deals_with_new_phase(state)
 
         return phase.return_feedback(state)
-
-        
 
     def turn_angel_into_villager(self, state: StateWW):
         list_ids_angel: List[int] = self.get_id_player_with_role(
@@ -502,7 +496,7 @@ Good luck!
             i
             for i in range(self.n_players)
             if (state.list_are_alive[i] or allow_dead_player)
-            and state.identities[i].have_status(status)
+            and state.identities[i].has_status(status)
         ]
         if return_list:
             return ids_players_with_status
@@ -511,8 +505,6 @@ Good luck!
         ), f"There should be exactly one player with the status {status}."
         id_player_with_status = ids_players_with_status[0]
         return id_player_with_status
-
-    
 
     def get_n_players(self) -> int:
         """Return the number of players in the game.
@@ -537,6 +529,8 @@ Good luck!
             else:
                 for i in range(self.n_players):
                     if list_is_playing[i]:
-                        state.common_obs.log(f"\n>>> Player {i} is playing :\n{state.common_obs[i]}")
+                        state.common_obs.log(
+                            f"\n>>> Player {i} is playing :\n{state.common_obs[i]}"
+                        )
                         if self.config["pause_at_each_obs_print"]:
                             input("Press any key to continue...")

@@ -4,13 +4,11 @@ from boardgames.games.werewolves.state import StateWW
 from boardgames.games.werewolves.statutes.base_status import Status
 
 
-
-
 #     IS_WOLF = "is_wolf"
 #     HAS_INFECTION_POWER = "has_infection_power"
 #     HAS_HEALING_POTION = "has_healing_potion"
 #     HAS_DEATH_POTION = "has_death_potion"
-#     IS_PROTECTED_SAVIOR = "is_protected_savior"
+#     IS_PROTECTED_SAVIOR = "is_protected_bodyguard"
 #     IS_PROTECTED_ELDER = "is_protected_elder"
 #     IS_PROTECTED_RED_HOOD = "is_protected_red_hood"
 #     IS_COUPLE_MEMBER = "is_couple_member"

@@ -53,14 +53,15 @@ class Phase
 class Role
     @classmethod
     def get_name(cls) -> str:
-        
+    
+    @classmethod
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
 
     def get_initial_statutes(self) -> List[Status]:
         return []
 
-    def get_associated_phases(self) -> List[str]:
+    def get_associated_phases(self) -> List[Phase]:
         return []
 
     @classmethod

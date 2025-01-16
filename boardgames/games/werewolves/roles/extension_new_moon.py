@@ -6,10 +6,10 @@ from boardgames.games.werewolves.roles.base_role import RoleWW
 from boardgames.games.werewolves.phase.base_phase import Phase
 
 
-class RoleSavior(RoleWW):
+class RoleBodyguard(RoleWW):
     @classmethod
     def get_name(cls) -> str:
-        return "Savior"
+        return "Bodyguard"
 
     def get_initial_faction(cls) -> FactionsWW:
         return FactionsWW.VILLAGE
@@ -23,7 +23,7 @@ class RoleSavior(RoleWW):
     @classmethod
     def get_textual_description(cls) -> str:
         return (
-            "The savior is a villager with a special power. The savior can protect a player from the werewolves' attack."
+            "The bodyguard is a villager with a special power. The bodyguard can protect a player from the werewolves' attack."
             "Your power are : \n"
             "- each night, you can choose a player to protect. This player will survive the werewolves' attack if he is chosen by the werewolves."
         )
@@ -78,6 +78,6 @@ class RoleVillageFool(RoleWW):
 
 ROLES_EXTENSION_NEW_MOON = {
     RoleElder.get_name(): RoleElder,
-    RoleSavior.get_name(): RoleSavior,
+    RoleBodyguard.get_name(): RoleBodyguard,
     RoleVillageFool.get_name(): RoleVillageFool,
 }

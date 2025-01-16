@@ -610,11 +610,16 @@ class StateWW(State):
         #     self.night_attacks == RoleJudge.ABSENT_NIGHT_INDICATOR
         # ):  # happens if Judge decided to create a 2nd vote
         # pass
-        if len(self.night_attacks) == 0:
+        # Protection statuses are applied first
+        for id_player in self.get_list_id_players_alive():
+            for status in self.identities[id_player].statutes:
+                status.apply_protection_status(self, id_player)
+        if sum(len(causes) for causes in self.night_attacks.values()) == 0:
             self.common_obs.add_global_message("No one has died during the night.")
         else:
             items = list(self.night_attacks.items())
             random.shuffle(items)  # Randomize the order of the deaths to avoid bias
+            # Then the deaths are applied
             for id_player, causes in self.night_attacks.items():
                 for cause in causes:
                     self.apply_death_consequences(id_player, cause)
@@ -787,8 +792,7 @@ class StateWW(State):
             i
             for i in range(self.n_players)
             if (
-                self.identities[i].have_status(StatusIsWolf())
-                and self.list_are_alive[i]
+                self.identities[i].has_status(StatusIsWolf()) and self.list_are_alive[i]
             )
         ]
 

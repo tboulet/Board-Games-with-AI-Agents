@@ -162,11 +162,11 @@ class PhaseNightWolfVote(Phase):
         # if state.identities[id_target_final].have_status(
         #     Status.IS_PROTECTED_SAVIOR
         # ):
-        #     if RoleSavior() in [
+        #     if RoleBodyguard() in [
         #         state.identities[i].role
         #         for i in range(self.n_players)
         #         if state.list_are_alive[i]
-        #     ]:  # only works if the savior is alive this night
+        #     ]:  # only works if the bodyguard is alive this night
         #         attack_fails = True
         # if state.identities[id_target_final].have_status(Status.IS_PROTECTED_ELDER):
         #     state.identities[id_target_final].remove_status(
