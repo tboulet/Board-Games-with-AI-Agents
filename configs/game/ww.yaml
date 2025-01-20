@@ -17,12 +17,12 @@ config:
       n: 1
     # Abominable Sectarian:
     #   n: 1
-    # Angel: 
-    #   n: 1
+    Angel: 
+      n: 1
     # Wolfdog:
     #   n: 1
-    # Wild Child: 
-    #   n: 1
+    Wild Child: 
+      n: 1
     # Judge: 
     #   n: 1
     # Bear Showman: 

@@ -131,7 +131,8 @@ class Phase(ABC):
 LIST_NAMES_PHASES_ORDERED = [
     "Day Speech",
     "Day Vote",
-    "Victory Check",
+    "Angel Check",
+    "Announcement Night",
     "Bodyguard Phase",
     "Night Wolf Speech",
     "Night Wolf Vote",
@@ -148,7 +149,6 @@ LIST_NAMES_PHASES_ORDERED = [
     "Perfidious Wolf Attack",
     "Mercenary Check",
     "Pyromancer Phase",
-    "Angel Check",
     "Wolfdog Choice",
     "Judge Phase",
     "Bear Showman Phase",

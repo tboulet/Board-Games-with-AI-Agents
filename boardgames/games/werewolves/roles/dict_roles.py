@@ -8,6 +8,8 @@ from .seer import RoleSeer
 from .witch import RoleWitch
 from .hunter import RoleHunter
 from .bodyguard import RoleBodyguard
+from .angel import RoleAngel
+from.wild_child import RoleWildChild
 
 ROLES_CLASSES_WW: Dict[str, Type[RoleWW]] = {
     # Village - Ordinary roles
@@ -21,4 +23,7 @@ ROLES_CLASSES_WW: Dict[str, Type[RoleWW]] = {
     RoleHunter.get_name(): RoleHunter,
     # Werewolves
     RoleWerewolf.get_name(): RoleWerewolf,
+    # Hybrid roles
+    RoleAngel.get_name(): RoleAngel,
+    RoleWildChild.get_name(): RoleWildChild,    
 }

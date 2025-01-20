@@ -187,6 +187,8 @@ Good luck!
         state.start_new_day()
 
         # Get the returns of first state and extract the relevant information for reset() formalism
+        phase = state.phase_manager.get_current_phase()
+        feedback = phase.return_feedback(state)
         (
             rewards,  # should be vec(0) at reset
             list_is_playing,
@@ -194,7 +196,7 @@ Good luck!
             list_action_spaces,
             done,  # should be False at reset
             info,
-        ) = self.step_deals_with_new_phase(state)
+        ) = feedback
         return state, list_is_playing, list_obs, list_action_spaces, info
 
     def step(self, state: StateWW, joint_action: JointAction) -> Tuple[
@@ -217,16 +219,28 @@ Good luck!
         self.step_play_action(state, joint_action)
         idx_end_step = state.phase_manager.idx_current_phase
 
-        # Check if the game is over, and if so, return the rewards
-        if state.is_game_over():
-            return state.step_return_victory_remaining_faction(dont_return_state=False)
+        feedback = None
+        while feedback is None:
+            
+            # Check if the game is over, and if so, return the rewards
+            feedback_eventual_victory = state.get_feedback_eventual_victory()
+            if feedback_eventual_victory is not None:
+                return feedback_eventual_victory
 
-        # Change the subphase index
-        if idx_begin_step == idx_end_step:
-            state.idx_subphase += 1
-        else:
-            state.idx_subphase = 0
+            # Change the subphase index
+            if idx_begin_step == idx_end_step:
+                state.idx_subphase += 1
+            else:
+                state.idx_subphase = 0
 
+            # Get the feedback of the current phase
+            phase = state.phase_manager.get_current_phase()
+            feedback = phase.return_feedback(state)
+            
+            # If feedback is None, unsure the phase is advanced
+            if feedback is None:
+                assert state.phase_manager.get_current_phase() != phase, f"If feedback is None, the phase should have been advanced during the return_feedback method, but it was not. Phase : {phase.get_name()}"                    
+        
         # Get the returns of current state and return it as well as the updated state
         (
             rewards,
@@ -235,7 +249,7 @@ Good luck!
             list_action_spaces,
             done,
             info,
-        ) = self.step_deals_with_new_phase(state)
+        ) = feedback
 
         return (
             rewards,
@@ -261,94 +275,7 @@ Good luck!
         )
         phase.play_action(state, joint_action)
         return
-
-    def step_deals_with_new_phase(self, state: StateWW) -> Tuple[
-        JointReward,
-        JointPlayingInformation,
-        JointObservation,
-        JointActionSpace,
-        TerminalSignal,
-        InfoDict,
-    ]:
-        """Function called after the effect of the action on the state.
-
-        Args:
-            state (StateWW): the current state of the game
-
-        Returns:
-            JointReward: the rewards of the players
-            JointPlayingInformation: the list of players playing this round.
-            JointObservation: the observations of the players
-            JointActionSpaces: the action spaces of the players
-            TerminalSignal: a boolean indicating if the game is over
-            InfoDict: a dictionary of additional information
-        """
-        phase = state.phase_manager.get_current_phase()
-
-        # Check if this is a new night (in that case announce the night and initialize night variables)
-        first_night_phase = state.phase_manager.get_first_night_phase()
-        if first_night_phase is None:
-            # No more nights, continuing the game
-            state.night_attacks = defaultdict(set)
-            state.common_obs.log("[!] No more nights, continuing the game.")
-        elif first_night_phase == phase and state.idx_subphase == 0:
-            # New night, announce the night and initialize night variables
-            state.common_obs.add_global_message(
-                f"The composition of the remaining players is :\n{state.get_compo_listing()}"
-            )
-            state.common_obs.add_global_message(
-                f"The village is now going to sleep for night {state.turn+1}."
-            )
-            # Initialize night variables
-            state.night_attacks = defaultdict(set)
-            state.common_obs.log(f"[!] New night, initializing night variables.")
-
-        # # Check if this phase is related to a player that has the Pyromancer status, and in this case, skip it
-        # list_ids_pyromancer = self.get_id_player_with_role(
-        #     state, RolePyromancer, return_list=True
-        # )
-        # list_ids_target_pyromancer = self.get_id_player_with_status(
-        #     state, Status.HAS_PYROMANCER_MALUS, return_list=True
-        # )
-        # if (
-        #     len(list_ids_pyromancer) > 0
-        # ):  # i.e. there is an alive Pyromancer (that already played)
-        #     if (
-        #         len(list_ids_target_pyromancer) > 0
-        #     ):  # i.e. there is a player that has the Pyromancer malus
-        #         id_player_target_pyromancer: int = list_ids_target_pyromancer[0]
-        #         phases_associated_to_target_pyromancer = state.identities[
-        #             id_player_target_pyromancer
-        #         ].role.get_associated_phases()
-        #         if (
-        #             phase in phases_associated_to_target_pyromancer
-        #             and not phase in RolePyromancer().get_exception_phases()
-        #         ):
-        #             state.common_obs.add_message(
-        #                 f"The Pyromancer has unleashed their fiery power on you and burnt your house for this night. Consequently, you are unable to use your power this night.",
-        #                 idx_player=id_player_target_pyromancer,
-        #             )
-        #             state.game_phases.advance_phase()
-        #             state.identities[id_player_target_pyromancer].remove_status(
-        #                 Status.HAS_PYROMANCER_MALUS
-        #             )
-        #             return self.step_deals_with_new_phase(state)
-
-        return phase.return_feedback(state)
-
-    def turn_angel_into_villager(self, state: StateWW):
-        list_ids_angel: List[int] = self.get_id_player_with_role(
-            state, RoleAngel(), return_list=True
-        )
-        if len(list_ids_angel) == 0:
-            # Angel is already dead, return without doing anything
-            return
-        elif len(list_ids_angel) >= 2:
-            raise ValueError("There should be at most one angel.")
-        else:
-            id_angel = list_ids_angel[0]
-            state.identities[id_angel].change_faction(FactionsWW.VILLAGE)
-
+      
     def turn_mercenary_into_villager(self, state: StateWW):
         list_ids_mercenary: List[int] = self.get_id_player_with_role(
             state, RoleMercenary(), return_list=True
@@ -381,18 +308,6 @@ Good luck!
                 Status.IS_MERCENARY_TARGET
             )
 
-    def turn_player_into_wolf(self, state: StateWW, id_player: int):
-        list_ids_wolves_alive = self.get_list_id_wolves_alive(state)
-        state.common_obs.add_specific_message(
-            f"Player {id_player} has joined the wolves.",
-            list_ids_wolves_alive,
-        )
-        state.identities[id_player].change_faction(FactionsWW.WEREWOLVES)
-        state.identities[id_player].add_status(Status.IS_WOLF)
-        state.common_obs.add_message(
-            f"You joined the wolves. You see the other wolves are composed of {', '.join([str(i) for i in list_ids_wolves_alive])}.",
-            idx_player=id_player,
-        )
 
     # ================= Helper functions =================
 

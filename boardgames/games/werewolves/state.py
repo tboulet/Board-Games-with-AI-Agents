@@ -6,6 +6,8 @@ from enum import Enum
 import random
 from time import sleep
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+
+from regex import P
 from boardgames.common_obs import CommonObs
 from boardgames.games.werewolves.causes_of_deaths.base_cause import CauseOfDeath
 from boardgames.games.werewolves.factions import FactionsWW
@@ -118,8 +120,9 @@ class PhaseDaySpeech(Phase):
             if state.turn > 0:  # there is no last night at the first turn
                 state.apply_deaths_of_last_night()
             # If game is over, return the victory
-            if state.is_game_over():
-                return state.step_return_victory_remaining_faction()
+            feedback_eventual_victory = state.get_feedback_eventual_victory()
+            if feedback_eventual_victory is not None:
+                return feedback_eventual_victory
             # Announce the beginning of the day speech and set up the speech variables
             state.start_new_day()
 
@@ -246,6 +249,46 @@ class PhaseDayVote(Phase):
         )
 
 
+
+class PhaseAnnouncementNight(Phase):
+    
+    def get_name(self) -> str:
+        return "Announcement Night"
+    
+    def is_day_phase(self):
+        return True
+    
+    def play_action(self, state : "StateWW", joint_action : JointAction):
+        raise ValueError("Announcement Night should not play any action.")
+    
+    def return_feedback(self, state : "StateWW") -> Tuple[
+        JointReward,
+        JointPlayingInformation,
+        JointObservation,
+        JointActionSpace,
+        TerminalSignal,
+        InfoDict,
+    ]:
+        # Check if this is a new night (in that case announce the night and initialize night variables)
+        if state.phase_manager.get_first_night_phase() is None:
+            # No more nights, continuing the game
+            state.night_attacks = defaultdict(set)
+            state.common_obs.log("[!] No more nights, continuing the game.")
+        else:
+            # New night, announce the night and initialize night variables
+            state.common_obs.add_global_message(
+                f"The composition of the remaining players is :\n{state.get_compo_listing()}"
+            )
+            state.common_obs.add_global_message(
+                f"The village is now going to sleep for night {state.turn+1}."
+            )
+            # Initialize night variables
+            state.night_attacks = defaultdict(set)
+            state.common_obs.log(f"[!] New night, initializing night variables.")
+        # Advance to the next phase
+        state.phase_manager.advance_phase()
+        return
+            
 # Define the manager of phases
 class PhasesManagerWW:
     """Manager of the phases of the Werewolves game. It is responsible for the order of the phases and the transitions between them."""
@@ -256,6 +299,7 @@ class PhasesManagerWW:
         self.list_phases: List[Phase] = [
             PhaseDaySpeech(),
             PhaseDayVote(),
+            PhaseAnnouncementNight(),
         ]
         # Collect the phases associated with the roles in the composition
         set_phases_from_roles: Set[Phase] = set()
@@ -280,7 +324,7 @@ class PhasesManagerWW:
                 self.list_phases[i].is_day_phase()
                 for i in range(self.idx_first_night_phase)
             ]
-        ), "The phases should be dividedd in n day phases followed by m night phases, with n+m = len(list_phases)."
+        ), f"The phases should be dividedd in n day phases followed by m night phases, with n+m = len(list_phases), but the first {self.idx_first_night_phase} phases are not day phases : {[phase.get_name() for phase in self.list_phases[:self.idx_first_night_phase]]}."
 
     def advance_phase(self) -> None:
         """Advance to the next phase in the list of phases."""
@@ -367,16 +411,6 @@ class PhasesManagerWW:
 class StatusIsWolf(Status):
     def get_name(self):
         return "Is Wolf"
-
-    def apply_death_announcement_and_confirm(
-        self, state: "StateWW", id_player: int, cause: CauseOfDeath
-    ):
-        return True
-
-    def apply_death_consequences(
-        self, state: "StateWW", id_player: int, cause: CauseOfDeath
-    ):
-        pass
 
 
 class StateWW(State):
@@ -717,26 +751,58 @@ class StateWW(State):
             status.apply_death_consequences(self, id_player, cause)
         return
 
+    def turn_player_into_wolf(self, id_player: int):
+        self.common_obs.log(f"[!] Player {id_player} is turned into a wolf.")
+        list_ids_wolves_alive = self.get_list_id_wolves_alive()
+        self.common_obs.add_specific_message(
+            f"Player {id_player} has joined the wolves.",
+            list_ids_wolves_alive,
+        )
+        self.identities[id_player].change_faction(FactionsWW.WEREWOLVES)
+        self.identities[id_player].add_status(StatusIsWolf())
+        self.common_obs.add_message(
+            f"You joined the wolves. You see the other wolves are composed of players {', '.join([str(i) for i in list_ids_wolves_alive])}.",
+            idx_player=id_player,
+        )
+        
     # ===== Getter/Checker methods =====
 
-    def is_game_over(self) -> bool:
-        """Check if the game is over for faction reasons, ie. if there is only one faction alive.
-
-        Returns:
-            bool: whether the game is over (for faction reasons : only one faction alive)
-        """
+    def get_feedback_eventual_victory(self) -> Optional[Tuple]:
+        # Start by checking win conditions
+        identities_alive = {i: self.identities[i] for i in self.get_list_id_players_alive()}
+        winning_factions_by_conditions = []
+        for i, identity in identities_alive.items():
+            # Unsure the current player faction is the same as the faction of its role
+            if identity.role.is_win_condition_achieved and (
+                identity.faction == identity.role.get_initial_faction()
+            ):
+                winning_factions_by_conditions.append(identity.role.get_initial_faction())
+        if len(winning_factions_by_conditions) == 0:
+            # No player has won by win conditions, pass
+            pass
+        elif len(winning_factions_by_conditions) == 1:
+            # One faction has won, return the victory
+            return self.step_return_victory_of_faction(winning_factions_by_conditions[0], dont_return_state=False)
+        else:
+            # Multiple factions have won, they each get +1 reward.
+            self.common_obs.add_global_message(
+                f"Multiple factions have won the game together : {', '.join(winning_factions_by_conditions)}."
+            )
+            return self.step_return_victory_of_faction(winning_factions_by_conditions, donb_return_state=False)
+        
+        # Check if the game is over for faction reasons
         set_factions_alive = {
             self.identities[i].faction
             for i in range(self.n_players)
             if self.list_are_alive[i]
         }
         if len(set_factions_alive) <= 1:
-            self.common_obs.log(
-                f"[!] Game is over for faction reasons : remaining factions {set_factions_alive}."
-            )
-            return True
-        else:
-            return False
+            return self.step_return_victory_remaining_faction(dont_return_state=False)
+        
+        # Else, return None
+        return None
+    
+    
 
     def get_return_feedback_one_player(
         self, id_player: int, action_space: ActionsSpace
@@ -844,11 +910,11 @@ class StateWW(State):
                 for i in range(self.n_players)
                 if self.list_are_alive[i]
             ), f"All alive players should be in the same faction : {faction_winner}."
-            self.common_obs.add_global_message(
-                f"All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
-            )
             self.common_obs.log(
                 f"[!] All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
+            )
+            self.common_obs.add_global_message(
+                f"All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
             )
             return self.step_return_victory_of_faction(
                 faction_winner, dont_return_state=dont_return_state
