@@ -17,7 +17,10 @@ from boardgames.games.werewolves.phase.base_phase import (
     LIST_NAMES_PHASES_ORDERED,
 )
 from boardgames.games.werewolves.roles.base_role import RoleWW
-from boardgames.games.werewolves.statutes.base_status import Status
+from boardgames.games.werewolves.statutes.base_status import (
+    Status,
+    StatusBaseProtection,
+)
 from boardgames.types import (
     State,
     Observation,
@@ -59,6 +62,13 @@ class CauseWolfAttack(CauseOfDeath):
 
     def is_day_cause_of_death(self):
         return False
+
+
+# Define elementary statuses
+class StatusCannotVote(Status):
+
+    def get_name(self) -> str:
+        return "Cannot Vote"
 
 
 # Define elementary phases
@@ -213,7 +223,7 @@ class PhaseDayVote(Phase):
             for i in range(state.n_players)
             if (
                 state.list_are_alive[i]
-                # and not state.identities[i].have_status(Status.CANNOT_VOTE)
+                and not state.identities[i].has_status(StatusCannotVote())
             )
         ]
         rewards = [0.0] * state.n_players
@@ -249,19 +259,18 @@ class PhaseDayVote(Phase):
         )
 
 
-
 class PhaseAnnouncementNight(Phase):
-    
+
     def get_name(self) -> str:
         return "Announcement Night"
-    
+
     def is_day_phase(self):
         return True
-    
-    def play_action(self, state : "StateWW", joint_action : JointAction):
+
+    def play_action(self, state: "StateWW", joint_action: JointAction):
         raise ValueError("Announcement Night should not play any action.")
-    
-    def return_feedback(self, state : "StateWW") -> Tuple[
+
+    def return_feedback(self, state: "StateWW") -> Tuple[
         JointReward,
         JointPlayingInformation,
         JointObservation,
@@ -288,7 +297,8 @@ class PhaseAnnouncementNight(Phase):
         # Advance to the next phase
         state.phase_manager.advance_phase()
         return
-            
+
+
 # Define the manager of phases
 class PhasesManagerWW:
     """Manager of the phases of the Werewolves game. It is responsible for the order of the phases and the transitions between them."""
@@ -647,7 +657,8 @@ class StateWW(State):
         # Protection statuses are applied first
         for id_player in self.get_list_id_players_alive():
             for status in self.identities[id_player].statutes:
-                status.apply_protection_status(self, id_player)
+                if isinstance(status, StatusBaseProtection):
+                    status.apply_protection_status(self, id_player)
         if sum(len(causes) for causes in self.night_attacks.values()) == 0:
             self.common_obs.add_global_message("No one has died during the night.")
         else:
@@ -764,32 +775,38 @@ class StateWW(State):
             f"You joined the wolves. You see the other wolves are composed of players {', '.join([str(i) for i in list_ids_wolves_alive])}.",
             idx_player=id_player,
         )
-        
+
     # ===== Getter/Checker methods =====
 
     def get_feedback_eventual_victory(self) -> Optional[Tuple]:
         # Start by checking win conditions
-        identities_alive = {i: self.identities[i] for i in self.get_list_id_players_alive()}
+        identities_alive = {
+            i: self.identities[i] for i in self.get_list_id_players_alive()
+        }
         winning_factions_by_conditions = []
         for i, identity in identities_alive.items():
             # Unsure the current player faction is the same as the faction of its role
             if identity.role.is_win_condition_achieved and (
                 identity.faction == identity.role.get_initial_faction()
             ):
-                winning_factions_by_conditions.append(identity.role.get_initial_faction())
+                winning_factions_by_conditions.append(
+                    identity.role.get_initial_faction()
+                )
         if len(winning_factions_by_conditions) == 0:
             # No player has won by win conditions, pass
             pass
         elif len(winning_factions_by_conditions) == 1:
             # One faction has won, return the victory
-            return self.step_return_victory_of_faction(winning_factions_by_conditions[0], dont_return_state=False)
+            return self.step_return_victory_of_faction(
+                winning_factions_by_conditions[0]
+            )
         else:
             # Multiple factions have won, they each get +1 reward.
             self.common_obs.add_global_message(
                 f"Multiple factions have won the game together : {', '.join(winning_factions_by_conditions)}."
             )
-            return self.step_return_victory_of_faction(winning_factions_by_conditions, donb_return_state=False)
-        
+            return self.step_return_victory_of_faction(winning_factions_by_conditions)
+
         # Check if the game is over for faction reasons
         set_factions_alive = {
             self.identities[i].faction
@@ -797,12 +814,10 @@ class StateWW(State):
             if self.list_are_alive[i]
         }
         if len(set_factions_alive) <= 1:
-            return self.step_return_victory_remaining_faction(dont_return_state=False)
-        
-        # Else, return None
+            return self.step_return_victory_remaining_faction()
+
+        # Else, return None (the game is not over)
         return None
-    
-    
 
     def get_return_feedback_one_player(
         self, id_player: int, action_space: ActionsSpace
@@ -875,13 +890,8 @@ class StateWW(State):
 
     # ===== Victory returns methods =====
 
-    def step_return_victory_remaining_faction(
-        self, dont_return_state: bool = True
-    ) -> Tuple:
+    def step_return_victory_remaining_faction(self) -> Tuple:
         """Perform the return feedback step when the game is over for faction reasons (only one faction alive).
-
-        Args:
-            dont_return_state (bool, optional): whether to not include the state in the return. Defaults to True (step_return_feedback returns).
 
         Returns:
             Tuple: the .step() returns
@@ -901,7 +911,8 @@ class StateWW(State):
             )
             self.common_obs.log("[!] All players are dead. The game is a draw.")
             return self.step_return_victory_of_faction(
-                self, None, dont_return_state=dont_return_state
+                self,
+                None,
             )
         elif len(set_factions_alive) == 1:
             faction_winner = set_factions_alive.pop()
@@ -917,7 +928,7 @@ class StateWW(State):
                 f"All players alive are in the faction {faction_winner}. The game is won by the {faction_winner}."
             )
             return self.step_return_victory_of_faction(
-                faction_winner, dont_return_state=dont_return_state
+                faction_winner,
             )
         else:
             raise ValueError(
@@ -927,7 +938,6 @@ class StateWW(State):
     def step_return_victory_of_faction(
         self,
         faction: Union[FactionsWW, List[FactionsWW]],
-        dont_return_state: bool = True,
     ) -> Tuple:
         """Perform the return feedback step when the game is won by a faction or a group of factions.
         Winning players will receive a reward of 1.0, losing players will receive a reward of -1.0.
@@ -935,7 +945,6 @@ class StateWW(State):
 
         Args:
             faction (Union[FactionsWW, List[FactionsWW]]): the faction or list of factions that won the game
-            dont_return_state (bool, optional): whether to not include the state in the return. Defaults to True (step_return_feedback returns).
 
         Returns:
             Tuple: the .step() returns
@@ -963,25 +972,14 @@ class StateWW(State):
         list_action_spaces = [None] * self.n_players
         done = True
         self.done = True
-        if dont_return_state:
-            return (
-                rewards,
-                list_is_playing,
-                list_obs,
-                list_action_spaces,
-                done,
-                info,
-            )
-        else:
-            return (
-                rewards,
-                self,
-                list_is_playing,
-                list_obs,
-                list_action_spaces,
-                done,
-                info,
-            )
+        return (
+            rewards,
+            list_is_playing,
+            list_obs,
+            list_action_spaces,
+            done,
+            info,
+        )
 
     # ===== Helper methods =====
 

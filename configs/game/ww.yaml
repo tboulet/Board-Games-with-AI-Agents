@@ -15,9 +15,11 @@ config:
       n: 1
     Bodyguard:
       n: 1
-    # Abominable Sectarian:
-    #   n: 1
+    Elder:
+      n: 1
     Angel: 
+      n: 1
+    Village Fool:
       n: 1
     # Wolfdog:
     #   n: 1

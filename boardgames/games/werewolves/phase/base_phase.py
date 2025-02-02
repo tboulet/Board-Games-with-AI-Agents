@@ -31,7 +31,7 @@ class Phase(ABC):
 
         # Check if the game is over (irrelevant for the phase)
         if state.is_game_over():
-            return state.step_return_victory_remaining_faction(dont_return_state=False)
+            return state.step_return_victory_remaining_faction()
 
         # Play second part and return feedback
         phase = state.game_phases.get_current_phase()

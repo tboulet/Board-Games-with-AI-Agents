@@ -33,15 +33,10 @@ from boardgames.action_spaces import (
 )
 from boardgames.utils import str_to_literal
 from .state import StateWW
+from .statutes.base_status import Status
+from .phase.base_phase import Phase
+from .identity import Identity
 from .roles.base_role import RoleWW
-
-from .roles.original import *
-from .roles.extension_village import *
-from .roles.extension_new_moon import *
-from .roles.extension_personnages import *
-from .roles.extension_wolfy import *
-from .roles.extension_invisibles import *
-
 from .roles.dict_roles import ROLES_CLASSES_WW
 
 
@@ -225,21 +220,23 @@ Good luck!
             # Check if the game is over, and if so, return the rewards
             feedback_eventual_victory = state.get_feedback_eventual_victory()
             if feedback_eventual_victory is not None:
-                return feedback_eventual_victory
+                feedback = feedback_eventual_victory
 
-            # Change the subphase index
-            if idx_begin_step == idx_end_step:
-                state.idx_subphase += 1
+            # Else, play the next phase
             else:
-                state.idx_subphase = 0
+                # Change the subphase index
+                if idx_begin_step == idx_end_step:
+                    state.idx_subphase += 1
+                else:
+                    state.idx_subphase = 0
 
-            # Get the feedback of the current phase
-            phase = state.phase_manager.get_current_phase()
-            feedback = phase.return_feedback(state)
-            
-            # If feedback is None, unsure the phase is advanced
-            if feedback is None:
-                assert state.phase_manager.get_current_phase() != phase, f"If feedback is None, the phase should have been advanced during the return_feedback method, but it was not. Phase : {phase.get_name()}"                    
+                # Get the feedback of the current phase
+                phase = state.phase_manager.get_current_phase()
+                feedback = phase.return_feedback(state)
+                assert(feedback is None or len(feedback) == 6), f"Feedback should have 6 elements, but has {len(feedback)} elements."
+                # If feedback is None, unsure the phase is advanced
+                if feedback is None:
+                    assert state.phase_manager.get_current_phase() != phase, f"If feedback is None, the phase should have been advanced during the return_feedback method, but it was not. Phase : {phase.get_name()}"                    
         
         # Get the returns of current state and return it as well as the updated state
         (
