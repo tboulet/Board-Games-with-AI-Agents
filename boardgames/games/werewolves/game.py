@@ -54,7 +54,7 @@ class WerewolvesGame(BaseTextBasedGame):
         self.config = kwargs
 
     def get_game_context(self) -> str:
-        compo_listing = self.initial_compo_listing
+        compo_listing = "See later"
         context = f"""
 You will play a game of Werewolf. 
 
@@ -308,6 +308,32 @@ Good luck!
 
     # ================= Helper functions =================
 
+    def get_compo_listing(self, compo : Dict[str, dict]) -> str:
+        compo_listing = ""
+        role_name_to_n_and_RoleClass: Dict[str, Tuple[int, Type[RoleWW]]] = defaultdict(
+            lambda: (0, None)
+        )
+        for id_player in list_ids_players_alive:
+            role = self.identities[id_player].role
+            role_name = role.get_name()
+            # extract the class from the instance
+            RoleClass = type(role)
+            n, _ = role_name_to_n_and_RoleClass[role_name]
+            role_name_to_n_and_RoleClass[role_name] = (n + 1, RoleClass)
+        for i, (role_name, (n, RoleClass)) in enumerate(
+            sorted(
+                role_name_to_n_and_RoleClass.items(),
+                key=lambda x: x[1][1].get_initial_faction().value,
+            )
+        ):  # sort by faction name
+            if n == 1:
+                compo_listing += f"- {role_name} (faction {RoleClass.get_initial_faction()}) : {RoleClass.get_short_textual_description()}"
+            elif n > 1:
+                compo_listing += f"- {role_name} (faction {RoleClass.get_initial_faction()}) ({n} times) : {RoleClass.get_short_textual_description()}"
+            if i != len(role_name_to_n_and_RoleClass) - 1:
+                compo_listing += "\n"  # add a new line if not the last role
+        return compo_listing
+    
     def get_return_feedback_several_players(
         self,
         state: StateWW,

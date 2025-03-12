@@ -1,4 +1,4 @@
-name: random_and_human
+name: openAI_and_human
 configs_agents:
 - class_string: boardgames.agents.human:HumanAgent
 - class_string: boardgames.agents.openai_agent:OpenAI_Agent

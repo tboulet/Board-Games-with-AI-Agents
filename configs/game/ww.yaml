@@ -9,22 +9,22 @@ config:
       n: 5
     Seer:
       n: 1
-    Witch:
-      n: 1
-    Hunter:
-      n: 1
-    Bodyguard:
-      n: 1
-    Elder:
-      n: 1
-    Angel: 
-      n: 1
-    Village Fool:
-      n: 1
+    # Witch:
+    #   n: 1
+    # Hunter:
+    #   n: 1
+    # Bodyguard:
+    #   n: 1
+    # Elder:
+    #   n: 1
+    # Angel: 
+    #   n: 1
+    # Village Fool:
+    #   n: 1
     # Wolfdog:
     #   n: 1
-    Wild Child: 
-      n: 1
+    # Wild Child: 
+    #   n: 1
     # Judge: 
     #   n: 1
     # Bear Showman: 
