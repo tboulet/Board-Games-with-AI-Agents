@@ -60,7 +60,6 @@ class OpenAI_Agent(BaseTextAgent):
                         f"Please respect these restrictions: {action_space.get_textual_restrictions()} "
                         "and answer in the following format: 'Reasoning : <your reasoning>\nAction: <your action>'\n\n"
                         "For example: 'Reasoning : I think that ... and I should vote player 3\nAction: 3'"
-                        ,
                     )
                 }
             )
